@@ -40,10 +40,6 @@ Push: git push origin feature/nova-funcao
 
 Abra um Pull Request
 
-Role até o final da página e clique em:
-✅ Commit changes (botão verde)
-→ Deixe marcado: "Commit directly to the main branch"
-
 
 
 
