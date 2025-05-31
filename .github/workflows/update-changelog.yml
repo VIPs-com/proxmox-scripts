@@ -1,4 +1,4 @@
-name: Update CHANGELOG
+name: Update CHANGELOG and Release
 
 on:
   workflow_dispatch:
@@ -52,6 +52,12 @@ jobs:
           EMOJI="📜 Atualização"
         fi
 
+        # Detecta issues (ex.: #123 no commit)
+        ISSUE_NUM=$(echo "$COMMIT_MSG" | grep -o '#[0-9]*' | head -1 || echo "")
+        if [ -n "$ISSUE_NUM" ]; then
+          ISSUE_LINK="- Relacionado a: [$ISSUE_NUM](https://github.com/VIPs-com/proxmox-scripts/issues/${ISSUE_NUM#\#})"
+        fi
+
         # Verifica se já existe entrada para hoje
         if grep -q "## $(date +'%Y-%m-%d')" CHANGELOG.md; then
           echo "✓ Entrada já existe para hoje. Pulando..."
@@ -59,7 +65,7 @@ jobs:
         fi
         
         # Adiciona entrada com emoji dinâmico
-        sed -i "1i ## $EMOJI - v$VERSION ($(date +'%Y-%m-%d'))\n- **Descrição:** ${COMMIT_MSG}\n- **Por:** $AUTHOR\n- [🔗 Ver alterações]($COMMIT_URL)\n" CHANGELOG.md
+        sed -i "1i ## $EMOJI - v$VERSION ($(date +'%Y-%m-%d'))\n- **Descrição:** ${COMMIT_MSG}\n- **Por:** $AUTHOR\n${ISSUE_LINK}\n- [🔗 Ver alterações]($COMMIT_URL)\n" CHANGELOG.md
 
     - name: Commit Changes
       run: |
@@ -67,18 +73,17 @@ jobs:
         git commit -m "📜 Atualização automática do CHANGELOG (por VIPs.com)" || echo "Nenhuma mudança para commit"
         git push
 
-
-create-release:
-  needs: update-changelog
-  runs-on: ubuntu-latest
-  permissions:
-    contents: write
-  steps:
-    - uses: actions/checkout@v3
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: "v$(grep -m1 "VERSION=" proxmox-postinstall-aurora-luna.sh | cut -d'"' -f2 || echo "1.0.0")"
-        body_path: CHANGELOG.md
-        draft: false
-        prerelease: false
+  create-release:
+    needs: update-changelog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v$(grep -m1 "VERSION=" proxmox-postinstall-aurora-luna.sh | cut -d'"' -f2 || echo "1.0.0")"
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
