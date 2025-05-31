@@ -33,3 +33,6 @@ jobs:
         git add CHANGELOG.md
         git commit -m "📜 Atualização automática do CHANGELOG" || echo "Nenhuma mudança para commit"
         git push
+
+    - name: Debug - List Files
+      run: ls -la
