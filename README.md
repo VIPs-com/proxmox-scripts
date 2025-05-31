@@ -5,6 +5,7 @@
 ## 📚 Documentação
 - [CHANGELOG.md](CHANGELOG.md) - Histórico completo de alterações
 - ![CHANGELOG Auto-Updated](https://img.shields.io/badge/CHANGELOG-auto--updated-brightgreen)
+- ![GitHub Releases](https://img.shields.io/github/v/release/VIPs-com/proxmox-scripts?include_prereleases)
 
   
 ### 🔗 Links Rápidos
