@@ -36,3 +36,11 @@ jobs:
         git add CHANGELOG.md
         git commit -m "📜 Atualização automática do CHANGELOG" || echo "Nenhuma mudança para commit"
         git push
+
+    - name: Update CHANGELOG
+  run: |
+    if grep -q "## [$(date +'%Y-%m-%d')]" CHANGELOG.md; then
+      echo "Entrada já existe para hoje. Pulando..."
+      exit 0
+    fi
+    sed -i "1i ## [$(date +'%Y-%m-%d')] - Atualização Automática\n### Alterado\n- Script atualizado via GitHub Actions\n\n" CHANGELOG.md
