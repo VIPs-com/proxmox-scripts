@@ -1,3 +1,8 @@
+## 📜 Atualização - v8.x (2025-05-31)
+- **Descrição:** Update proxmox-postinstall-aurora-luna.sh
+- **Por:** VIPs.com
+- [🔗 Ver alterações](https://github.com/VIPs-com/proxmox-scripts/commit/a3ce7c0b7412c317eec9ff2dc2a6d259296c4527)
+
 ## [2025-05-31] - Atualização Automática
 ### Alterado
 - Script atualizado via GitHub Actions
