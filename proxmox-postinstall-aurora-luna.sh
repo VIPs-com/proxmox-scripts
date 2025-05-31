@@ -8,9 +8,6 @@
 # 2. Todos os nós estão acessíveis via ping?
 # 3. Tem backup dos dados importantes?
 
-git commit -am "Teste final do CHANGELOG automático"
-git push
-
 ######
 #
 # ✅ Instruções de uso local (alternativa ao método com 'curl'):
@@ -475,3 +472,8 @@ if [[ $REPLY =~ ^[Ss]$ ]]; then
 else
     log_info "ℹ️ Reinício adiado. Lembre-se de executar 'reboot' manualmente no nó **$NODE_NAME** o mais rápido possível para aplicar todas as mudanças."
 fi
+
+# Adicione um comentário temporário no script:
+echo "# Teste $(date)" >> proxmox-postinstall-aurora-luna.sh
+git commit -am "Trigger CHANGELOG update"
+git push
