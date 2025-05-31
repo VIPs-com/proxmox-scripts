@@ -8,7 +8,7 @@
 # 2. Todos os nós estão acessíveis via ping?
 # 3. Tem backup dos dados importantes?
 
-######
+###### Commit + Push ##
 #
 # ✅ Instruções de uso local (alternativa ao método com 'curl'):
 #
