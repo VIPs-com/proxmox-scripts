@@ -66,3 +66,19 @@ jobs:
         git add CHANGELOG.md
         git commit -m "📜 Atualização automática do CHANGELOG (por VIPs.com)" || echo "Nenhuma mudança para commit"
         git push
+
+
+create-release:
+  needs: update-changelog
+  runs-on: ubuntu-latest
+  permissions:
+    contents: write
+  steps:
+    - uses: actions/checkout@v3
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: "v$(grep -m1 "VERSION=" proxmox-postinstall-aurora-luna.sh | cut -d'"' -f2 || echo "1.0.0")"
+        body_path: CHANGELOG.md
+        draft: false
+        prerelease: false
