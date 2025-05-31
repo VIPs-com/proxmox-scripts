@@ -38,15 +38,28 @@ jobs:
         AUTHOR="VIPs.com"
         COMMIT_URL="https://github.com/VIPs-com/proxmox-scripts/commit/$(git rev-parse HEAD)"
         COMMIT_MSG=$(git log -1 --pretty=format:'%s')
+        
+        # Define emoji com base na mensagem do commit
+        if echo "$COMMIT_MSG" | grep -qi "fix"; then
+          EMOJI="🐛 Correção"
+        elif echo "$COMMIT_MSG" | grep -qi "feat"; then
+          EMOJI="✨ Nova Feature"
+        elif echo "$COMMIT_MSG" | grep -qi "docs"; then
+          EMOJI="📚 Documentação"
+        elif echo "$COMMIT_MSG" | grep -qi "chore"; then
+          EMOJI="🔧 Manutenção"
+        else
+          EMOJI="📜 Atualização"
+        fi
 
         # Verifica se já existe entrada para hoje
-        if grep -q "## [$(date +'%Y-%m-%d')]" CHANGELOG.md; then
+        if grep -q "## $(date +'%Y-%m-%d')" CHANGELOG.md; then
           echo "✓ Entrada já existe para hoje. Pulando..."
           exit 0
         fi
         
-        # Adiciona entrada detalhada
-        sed -i "1i ## [$(date +'%Y-%m-%d')] - v$VERSION\n### Alterado\n- Script atualizado via GitHub Actions\n- Responsável: $AUTHOR\n- Mensagem: \"$COMMIT_MSG\"\n- [Ver alterações]($COMMIT_URL)\n\n" CHANGELOG.md
+        # Adiciona entrada com emoji dinâmico
+        sed -i "1i ## $EMOJI - v$VERSION ($(date +'%Y-%m-%d'))\n- **Descrição:** ${COMMIT_MSG}\n- **Por:** $AUTHOR\n- [🔗 Ver alterações]($COMMIT_URL)\n" CHANGELOG.md
 
     - name: Commit Changes
       run: |
