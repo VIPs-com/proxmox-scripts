@@ -2,6 +2,9 @@
 ![Proxmox Version](https://img.shields.io/badge/Proxmox-8.x-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
+## 📚 Documentação
+- [CHANGELOG.md](CHANGELOG.md) - Histórico completo de alterações
+
 ### 🔗 Links Rápidos
 - [Aurora WebUI](https://172.20.220.20:8006)
 - [Luna WebUI](https://172.20.220.21:8006)
