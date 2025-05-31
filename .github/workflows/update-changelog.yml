@@ -44,3 +44,14 @@ jobs:
       exit 0
     fi
     sed -i "1i ## [$(date +'%Y-%m-%d')] - Atualização Automática\n### Alterado\n- Script atualizado via GitHub Actions\n\n" CHANGELOG.md
+
+    - name: Update CHANGELOG
+  run: |
+    # Verifica se já existe entrada hoje
+    if grep -q "## [$(date +'%Y-%m-%d')]" CHANGELOG.md; then
+      echo "✓ Entrada já existe para hoje. Pulando..."
+      exit 0
+    fi
+    
+    # Adiciona nova entrada apenas se for inédita
+    sed -i "1i ## [$(date +'%Y-%m-%d')] - Atualização Automática\n### Alterado\n- Script atualizado via GitHub Actions\n\n" CHANGELOG.md
