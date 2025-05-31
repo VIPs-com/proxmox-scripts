@@ -25,9 +25,7 @@ curl -sL https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/proxmox
 
 🧩 Pré-requisitos
 Proxmox VE 8.x instalado
-
 Acesso root via SSH/WebUI
-
 Conexão com a internet
 
 ‼️ Troubleshooting
@@ -38,11 +36,8 @@ Erro	Solução
 Faça um fork
 
 Crie um branch: git checkout -b feature/nova-funcao
-
 Commit: git commit -m "Adiciona X"
-
 Push: git push origin feature/nova-funcao
-
 Abra um Pull Request
 
 
