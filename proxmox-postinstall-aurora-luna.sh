@@ -12,6 +12,8 @@
 git commit -am "Teste de CHANGELOG automático"
 git push origin main
 
+ls -a
+
 ######
 #
 # ✅ Instruções de uso local (alternativa ao método com 'curl'):
