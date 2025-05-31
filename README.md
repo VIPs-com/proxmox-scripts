@@ -4,7 +4,7 @@
 
 ## 📚 Documentação
 - [CHANGELOG.md](CHANGELOG.md) - Histórico completo de alterações
-- ![CHANGELOG Status](https://github.com/VIPs-com/proxmox-scripts/actions/workflows/update-changelog.yml/badge.svg)
+- ![CHANGELOG Auto-Updated](https://img.shields.io/badge/CHANGELOG-auto--updated-brightgreen)
 
   
 ### 🔗 Links Rápidos
