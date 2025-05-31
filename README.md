@@ -1,6 +1,11 @@
-# 🚀 Scripts Proxmox VE 8 - Cluster Aurora/Luna
+# 🚀 Scripts Proxmox VE 8 - Cluster Aurora/Luna <img src="assets/proxmox-icon.png" width="30">
 ![Proxmox Version](https://img.shields.io/badge/Proxmox-8.x-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
+
+### 🔗 Links Rápidos
+- [Aurora WebUI](https://172.20.220.20:8006)
+- [Luna WebUI](https://172.20.220.21:8006)
+- [Documentação Proxmox](https://pve.proxmox.com/wiki/Main_Page)
 
 ## 📌 postinstall-aurora-luna.sh
 **Script de pós-instalação para nós Aurora (172.20.220.20) e Luna (172.20.220.21)**
@@ -39,6 +44,8 @@ Commit: git commit -m "Adiciona X"
 Push: git push origin feature/nova-funcao
 
 Abra um Pull Request
+
+
 
 
 
