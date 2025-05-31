@@ -31,6 +31,8 @@
 #    - 172.21.221.0/24 (Rede Interna - Gerenciamento)
 #    - 172.25.125.0/24 (Wi-Fi Arkadia)
 
+# ✅ Teste de atualização automática - $(date)
+
 # 🛠️ Configurações Essenciais - Podem ser sobrescritas por /etc/proxmox-postinstall.conf
 CLUSTER_NETWORK="172.20.220.0/24" # Rede para comunicação interna do cluster (Corosync, pve-cluster)
 NODE_NAME=$(hostname)             # Nome do servidor atual
