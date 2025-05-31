@@ -8,10 +8,7 @@
 # 2. Todos os nós estão acessíveis via ping?
 # 3. Tem backup dos dados importantes?
 
-## ✨ Nova Feature - v1.2.0 (2025-06-01)
-- **Descrição:** Adicionado suporte a novos pacotes
-- **Por:** VIPs.com
-- [🔗 Ver alterações](https://github.com/.../abc123)
+git commit -m "fix: corrige erro no script"  # Vai gerar 🐛 no CHANGELOG
 
 ######
 #
