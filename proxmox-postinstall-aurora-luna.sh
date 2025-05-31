@@ -32,6 +32,8 @@
 #    - 172.25.125.0/24 (Wi-Fi Arkadia)
 
 # ✅ Teste de atualização automática - $(date)
+git commit -am "Teste de CHANGELOG automático"
+git push
 
 # 🛠️ Configurações Essenciais - Podem ser sobrescritas por /etc/proxmox-postinstall.conf
 CLUSTER_NETWORK="172.20.220.0/24" # Rede para comunicação interna do cluster (Corosync, pve-cluster)
