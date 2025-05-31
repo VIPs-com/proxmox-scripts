@@ -11,7 +11,7 @@ jobs:
   update-changelog:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Permissão crítica que faltava
+      contents: write  # Isso está correto
 
     steps:
     - uses: actions/checkout@v3
@@ -25,33 +25,23 @@ jobs:
 
     - name: Update CHANGELOG
       run: |
+        # Verifica se o arquivo existe, se não, cria
         if [ ! -f CHANGELOG.md ]; then
           echo "# Histórico de Alterações" > CHANGELOG.md
           echo "" >> CHANGELOG.md
         fi
-        sed -i "1i ## [$(date +'%Y-%m-%d')] - Atualização Automática\n### Alterado\n- Script atualizado via GitHub Actions\n" CHANGELOG.md
+        
+        # Verifica se já existe entrada para hoje
+        if grep -q "## [$(date +'%Y-%m-%d')]" CHANGELOG.md; then
+          echo "✓ Entrada já existe para hoje. Pulando..."
+          exit 0
+        fi
+        
+        # Adiciona nova entrada
+        sed -i "1i ## [$(date +'%Y-%m-%d')] - Atualização Automática\n### Alterado\n- Script atualizado via GitHub Actions\n\n" CHANGELOG.md
 
     - name: Commit Changes
       run: |
         git add CHANGELOG.md
         git commit -m "📜 Atualização automática do CHANGELOG" || echo "Nenhuma mudança para commit"
         git push
-
-    - name: Update CHANGELOG
-  run: |
-    if grep -q "## [$(date +'%Y-%m-%d')]" CHANGELOG.md; then
-      echo "Entrada já existe para hoje. Pulando..."
-      exit 0
-    fi
-    sed -i "1i ## [$(date +'%Y-%m-%d')] - Atualização Automática\n### Alterado\n- Script atualizado via GitHub Actions\n\n" CHANGELOG.md
-
-    - name: Update CHANGELOG
-  run: |
-    # Verifica se já existe entrada hoje
-    if grep -q "## [$(date +'%Y-%m-%d')]" CHANGELOG.md; then
-      echo "✓ Entrada já existe para hoje. Pulando..."
-      exit 0
-    fi
-    
-    # Adiciona nova entrada apenas se for inédita
-    sed -i "1i ## [$(date +'%Y-%m-%d')] - Atualização Automática\n### Alterado\n- Script atualizado via GitHub Actions\n\n" CHANGELOG.md
