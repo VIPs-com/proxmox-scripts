@@ -2,7 +2,11 @@
 
 # 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (Versão 10/10 - Foco no Essencial e Usabilidade)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
-#
+
+# ✅ Verifique ANTES de executar:
+# 1. Você já criou o cluster via WebUI? (Datacenter > Cluster > Create)
+# 2. Todos os nós estão acessíveis via ping?
+# 3. Tem backup dos dados importantes?
 
 ######
 #
