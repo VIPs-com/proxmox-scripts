@@ -4,7 +4,9 @@
 
 ## 📚 Documentação
 - [CHANGELOG.md](CHANGELOG.md) - Histórico completo de alterações
+- ![CHANGELOG Automation](https://github.com/VIPs-com/proxmox-scripts/actions/workflows/update-changelog.yml/badge.svg)
 
+  
 ### 🔗 Links Rápidos
 - [Aurora WebUI](https://172.20.220.20:8006)
 - [Luna WebUI](https://172.20.220.21:8006)
