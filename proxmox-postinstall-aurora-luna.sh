@@ -8,11 +8,8 @@
 # 2. Todos os nós estão acessíveis via ping?
 # 3. Tem backup dos dados importantes?
 
-# Teste de atualização automática - $(date)
-git commit -am "Teste de CHANGELOG automático"
-git push origin main
-
-ls -a
+git commit -am "Teste final do CHANGELOG automático"
+git push
 
 ######
 #
