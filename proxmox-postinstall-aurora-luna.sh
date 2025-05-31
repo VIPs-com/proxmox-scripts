@@ -473,7 +473,3 @@ else
     log_info "ℹ️ Reinício adiado. Lembre-se de executar 'reboot' manualmente no nó **$NODE_NAME** o mais rápido possível para aplicar todas as mudanças."
 fi
 
-# Adicione um comentário temporário no script:
-echo "# Teste $(date)" >> proxmox-postinstall-aurora-luna.sh
-git commit -am "Trigger CHANGELOG update"
-git push
