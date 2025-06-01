@@ -128,40 +128,7 @@ chmod +x nome-do-script.sh
 
 ---
 
-## 🛠️ Ferramentas Auxiliares
 
-### 🔍 `verifica-rede.sh` - Diagnóstico de Infraestrutura
-
-📌 **Local:** `utils/verifica-rede.sh`  
-✨ **Funcionalidades:**
-- 📏 Medição de latência entre nós
-- 🔍 Verificação de portas essenciais (22, 8006, 5404-5407)
-- 🌐 Teste de DNS reverso
-
-🚀 **Como Usar:**
-```bash
-# Opção 1: Execução direta
-curl -sL https://bit.ly/vips-proxmox-check | bash
-
-# Opção 2: Download e execução local
-mkdir -p utils && cd utils
-wget https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh
-chmod +x verifica-rede.sh && ./verifica-rede.sh
-```
-
-📋 **Saída de Exemplo:**
-```plaintext
-🔍 Diagnóstico de Rede - [Data]
-----------------------------------------
-✅ 172.20.220.20 → Latência: 1.24ms
-✅ Porta 8006 → Acessível
-❌ DNS reverso → Configurar PTR
-----------------------------------------
-```
-
-⚠️ **Requisitos:**
-- `dig` instalado (pacote `dnsutils`)
-- Acesso root (para teste de portas)
 
 ---
 
