@@ -1,6 +1,3 @@
-Vamos criar uma versão **perfeita** combinando o melhor dos dois READMEs, mantendo toda a informação importante mas com organização clara. Aqui está o código **100% testado** para você copiar e colar:
-
-```markdown
 # 🚀 Proxmox Scripts - Cluster Aurora/Luna <img src="assets/proxmox-icon.png" width="30">
 
 ![Proxmox Version](https://img.shields.io/badge/Proxmox-8.x-orange)
@@ -40,27 +37,30 @@ curl -sL https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/proxmox
 wget https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/proxmox-postinstall-aurora-luna.sh
 chmod +x proxmox-postinstall-aurora-luna.sh
 sudo ./proxmox-postinstall-aurora-luna.sh
-```
 
-### 🧩 Pré-requisitos
-- Proxmox VE 8.x instalado
-- Acesso root via SSH/WebUI
-- Conexão com a internet
+🧩 Pré-requisitos
+Proxmox VE 8.x instalado
 
-## 🚨 Troubleshooting
-| Erro               | Solução                          |
-|--------------------|----------------------------------|
-| "Falha no NTP"     | Verifique a porta UDP 123 no firewall |
-| "IP inválido"      | Confira os IPs em `/etc/proxmox-postinstall.conf` |
-| "Falha no firewall"| Execute `pve-firewall status` para logs |
+Acesso root via SSH/WebUI
 
-## 🤝 Como Contribuir
-1. Faça um fork do projeto
-2. Crie uma branch: `git checkout -b minha-feature`
-3. Commit suas mudanças: `git commit -m "✨ Adiciona recurso X"`
-4. Push: `git push origin minha-feature`
-5. Abra um Pull Request
+Conexão com a internet
 
-## 📄 Licença
-[MIT](LICENSE) © VIPs.com
-```
+🚨 Troubleshooting
+Erro	Solução
+"Falha no NTP"	Verifique a porta UDP 123 no firewall
+"IP inválido"	Confira os IPs em /etc/proxmox-postinstall.conf
+"Falha no firewall"	Execute pve-firewall status para logs
+🤝 Como Contribuir
+Faça um fork do projeto
+
+Crie uma branch: git checkout -b minha-feature
+
+Commit suas mudanças: git commit -m "✨ Adiciona recurso X"
+
+Push: git push origin minha-feature
+
+Abra um Pull Request
+
+📄 Licença
+MIT © VIPs.com
+
