@@ -29,7 +29,11 @@
 | `172.25.125.0/24`| Rede Wi-Fi        |
 
 ---
+### 📚 Documentação & Recursos
 
+- 🔧 [Guia de Adaptação do Script (ADAPTATION_GUIDE.md)](./ADAPTATION_GUIDE.md)
+
+---
 ## 🚀 Como Instalar
 
 ```bash
