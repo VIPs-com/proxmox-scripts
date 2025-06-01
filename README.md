@@ -1,3 +1,4 @@
+
 # 🚀 Proxmox Scripts - Cluster Aurora/Luna
 
 ![Proxmox Version](https://img.shields.io/badge/Proxmox-8.x-orange)
@@ -5,31 +6,28 @@
 ![CHANGELOG](https://img.shields.io/badge/CHANGELOG-auto--updated-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-> Scripts de automação para servidores **Proxmox VE** no cluster **Aurora/Luna**
+> Scripts de automação para servidores Proxmox VE no cluster Aurora/Luna
 
 ---
 
 ## 📌 Script de Pós-Instalação
 
-**`postinstall-aurora-luna.sh`** – Configura automaticamente os nós do cluster:
-
-- **Aurora** – `172.20.220.20`  
-- **Luna** – `172.20.220.21`
-
----
+**`postinstall-aurora-luna.sh`** - Configura automaticamente os nós:
+- **Aurora** (`172.20.220.20`)
+- **Luna** (`172.20.220.21`)
 
 ### 🔥 Recursos Principais
 
-- 🛡️ Configuração automática de **firewall**
-- 🔒 Aplicação de **hardening SSH**
-- ⏱ Ativação da **sincronização NTP**
-- 🌐 Suporte às **VLANs**:
+- 🛡️ Configuração automática de firewall  
+- 🔒 Hardening SSH  
+- ⏱ Sincronização NTP  
+- 🌐 Suporte às VLANs:
 
 | VLAN             | Propósito         |
 |------------------|-------------------|
-| `172.20.220.0/24` | Cluster principal |
-| `172.21.221.0/24` | Gerenciamento     |
-| `172.25.125.0/24` | Rede Wi-Fi        |
+| `172.20.220.0/24`| Cluster principal |
+| `172.21.221.0/24`| Gerenciamento     |
+| `172.25.125.0/24`| Rede Wi-Fi        |
 
 ---
 
@@ -49,10 +47,30 @@ sudo ./proxmox-postinstall-aurora-luna.sh
 
 ## 🔗 Links Úteis
 
-- [🌐 Acessar Aurora WebUI](https://172.20.220.20:8006)
-- [🌐 Acessar Luna WebUI](https://172.20.220.21:8006)
-- [📄 Histórico de alterações (CHANGELOG)](https://github.com/VIPs-com/proxmox-scripts/releases)
-- [⚙️ Workflow de automação (GitHub Actions)](https://github.com/VIPs-com/proxmox-scripts/actions)
+- [Acessar Aurora WebUI](https://172.20.220.20:8006)  
+- [Acessar Luna WebUI](https://172.20.220.21:8006)  
+- [Ver histórico de alterações](https://github.com/VIPs-com/proxmox-scripts/releases)  
+- [Workflow de automação](https://github.com/VIPs-com/proxmox-scripts/actions)  
+
+---
+
+## ⚡ DICA IMPORTANTE
+
+Após rodar o script e reiniciar o nó, execute o comando abaixo para validar a performance do sistema:
+
+```bash
+pveperf
+```
+
+---
+
+<!--
+## 🎥 Demonstração
+
+*Em breve: GIF ou vídeo curto mostrando a execução do script.*
+
+![Exemplo de Execução](link-do-gif-ou-screenshot.gif)
+-->
 
 ---
 
@@ -60,18 +78,48 @@ sudo ./proxmox-postinstall-aurora-luna.sh
 
 ```bash
 git clone https://github.com/VIPs-com/proxmox-scripts.git
-cd proxmox-scripts
-
 git checkout -b minha-feature
-
 # Faça suas melhorias
-
 git commit -m "Minha contribuição"
 git push origin minha-feature
+# Abra um Pull Request no GitHub
 ```
-
-Depois, abra um **Pull Request** no GitHub!
 
 ---
 
-📬 *Sugestões, bugs ou melhorias? Sinta-se à vontade para abrir uma issue ou PR!*
+## ❓ FAQ - Problemas Comuns
+
+### 🔹 Erro: "Falha ao juntar nó no cluster"
+
+✅ Solução: Verifique se o firewall permite o tráfego Corosync (`UDP 5404-5405`).  
+✅ Teste rápido:  
+
+```bash
+nc -zv 172.20.220.20 5404
+```
+
+---
+
+### 🔹 Erro: "Permissão negada ao rodar script"
+
+✅ Solução: Torne o script executável com:  
+
+```bash
+chmod +x nome-do-script.sh
+```
+
+---
+
+### 🔹 Erro: "Comando pveperf não encontrado"
+
+✅ Solução: Certifique-se que o Proxmox VE está instalado e atualizado corretamente no nó.
+
+---
+
+**Contribuições e sugestões são sempre bem-vindas!**
+
+---
+
+# Licença
+
+MIT License © VIPs-com
