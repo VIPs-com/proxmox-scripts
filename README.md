@@ -129,39 +129,38 @@ chmod +x nome-do-script.sh
 ---
 
 
-# 🛠️ Proxmox Scripts
 
-Este repositório contém scripts úteis para automatizar e facilitar o processo de instalação, configuração e diagnóstico de ambientes Proxmox VE.
+# 📦 proxmox-scripts
 
-## 📁 Estrutura
-
-- `postinstall-aurora-luna.sh` — Script de pós-instalação para otimizar e configurar nós Proxmox.
-- `utils/verifica-rede.sh` — Script de verificação de rede para checagens antes de instalar o cluster.
+Scripts úteis para automação e configuração de ambientes com **Proxmox VE**, com foco em clusters e boas práticas de rede.
 
 ---
 
-## 🔍 Script de Verificação de Rede
+## 🛠️ Ferramentas de Diagnóstico
+
+### 🔍 Script de Verificação de Rede
 
 **Arquivo:** `utils/verifica-rede.sh`
 
-Este script serve como uma ferramenta de **pré-verificação essencial** para o seu ambiente Proxmox VE. Ele deve ser executado **antes** do script principal de pós-instalação (`postinstall-aurora-luna.sh`) para garantir que sua rede e conectividade básica estejam funcionando corretamente.
+Este script serve como uma ferramenta de **pré-verificação essencial** para o seu ambiente Proxmox VE. Ele deve ser executado **antes** do script principal de pós-instalação (`post-install.sh`) para garantir que sua rede e conectividade básica estejam funcionando corretamente.
 
-### Funcionalidades
+#### ✅ Funcionalidades:
+* 📶 **Teste de latência:** Mede a latência de ping entre os nós do seu cluster.
+* 🔌 **Verificação de portas essenciais:** Confere a acessibilidade de portas críticas como SSH (22), WebUI (8006), e as portas do Corosync (5404, 5405, 5406, 5407).
+* 🌐 **Checagem de DNS reverso:** Verifica se a resolução reversa de DNS está configurada corretamente para os IPs dos seus nós.
 
-- 📶 **Teste de latência:** Mede a latência de ping entre os nós do seu cluster.
-- 🔌 **Verificação de portas essenciais:** Confere a acessibilidade de portas críticas como SSH (22), WebUI (8006) e as portas do Corosync (5404–5407).
-- 🌐 **Checagem de DNS reverso:** Verifica se a resolução reversa de DNS está configurada corretamente para os IPs dos seus nós.
+---
 
-### Como Usar
+## 🚀 Como Usar
 
 Execute este script diretamente no terminal de **cada nó Proxmox** para validar sua configuração de rede:
 
+### 1. Execução rápida via `curl`:
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh)
 ```
 
-Ou, se preferir, baixe e execute localmente:
-
+### 2. Ou baixe e execute manualmente:
 ```bash
 mkdir -p utils
 wget -O utils/verifica-rede.sh https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh
@@ -171,19 +170,47 @@ chmod +x utils/verifica-rede.sh
 
 ---
 
-## 📌 Requisitos
+## 🖥️ Exemplo de Saída
 
-- Proxmox VE instalado
-- Acesso root ou sudo ao terminal
-- Conexão de rede funcional entre os nós do cluster
+```bash
+ℹ️  Diagnóstico de Rede - Sat Jun 01 16:40:00 UTC 2025
+----------------------------------------
+ℹ️  1/3 - Medição de Latência:
+✅  172.20.220.20 → Latência média: 0.65ms
+✅  172.20.220.21 → Latência média: 0.58ms
 
-## 🤝 Contribuições
+ℹ️  2/3 - Verificando portas essenciais:
+🔧 Nó 172.20.220.20:
+✅ Porta 22 → Acessível
+✅ Porta 8006 → Acessível
+✅ Porta 5404 → Acessível
+[...]
 
-Sinta-se à vontade para abrir *Issues* ou enviar *Pull Requests* com melhorias.
+ℹ️  3/3 - Verificando resolução DNS:
+✅  172.20.220.20 → node01.localdomain
+✅  172.20.220.21 → node02.localdomain
+
+📊 Resultado Final:
+✅ Todos os testes básicos passaram!
+ℹ️  Recomendação: Prossiga com a instalação
+```
 
 ---
 
-© VIPs-com | Scripts para automação Proxmox
+## 🤝 Contribuições
+
+Contribuições são bem-vindas! Sinta-se à vontade para abrir uma *issue* ou enviar um *pull request* com melhorias, correções ou novos scripts.
+
+---
+
+## 📄 Licença
+
+Este projeto está licenciado sob a [MIT License](LICENSE).
+
+---
+
+Feito com 💻 para o ambiente Proxmox.
+
 
 
 ---
