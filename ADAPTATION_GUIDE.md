@@ -157,21 +157,3 @@ apt update
 Com esse guia, adaptar o script `postinstall-aurora-luna.sh` para sua própria rede se torna simples e seguro. Mantenha sempre uma versão do script personalizada para seu ambiente e utilize este guia como referência sempre que necessário.
 
 ---
-
-## 📘 Como Adicionar este Guia ao Repositório
-
-1. No seu GitHub, vá em **VIPs-com/proxmox-scripts**.  
-2. Clique em **"Add file" > "Create new file"**.  
-3. Nomeie como: `ADAPTATION_GUIDE.md`.  
-4. Cole este conteúdo.  
-5. Clique em **"Commit new file"**.
-
-### ➕ Adicione o Link no README.md
-
-Edite seu `README.md` e, na seção de documentação, inclua:
-
-```markdown
-### 📚 Documentação & Recursos
-
-- 🔧 [Guia de Adaptação do Script (ADAPTATION_GUIDE.md)](./ADAPTATION_GUIDE.md)
-```
