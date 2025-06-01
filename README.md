@@ -193,27 +193,8 @@ chmod +x utils/verifica-rede.sh
 📊 Resultado Final:
 ✅ Todos os testes básicos passaram!
 ℹ️  Recomendação: Prossiga com a instalação
+
 ```
-
----
-
-## 🤝 Contribuições
-
-Contribuições são bem-vindas! Sinta-se à vontade para abrir uma *issue* ou enviar um *pull request* com melhorias, correções ou novos scripts.
-
----
-
-## 📄 Licença
-
-Este projeto está licenciado sob a [MIT License](LICENSE).
-
----
-
-Feito com 💻 para o ambiente Proxmox.
-
-
-
----
 
 # Licença
 
