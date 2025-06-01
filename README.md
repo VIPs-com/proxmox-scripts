@@ -47,10 +47,10 @@ sudo ./proxmox-postinstall-aurora-luna.sh
 
 ## 🔗 Links Úteis
 
-- [Acessar Aurora WebUI](https://172.20.220.20:8006)  
-- [Acessar Luna WebUI](https://172.20.220.21:8006)  
-- [Ver histórico de alterações](https://github.com/VIPs-com/proxmox-scripts/releases)  
-- [Workflow de automação](https://github.com/VIPs-com/proxmox-scripts/actions)  
+- 🌐 [Acessar Aurora WebUI](https://172.20.220.20:8006)  
+- 🌐 [Acessar Luna WebUI](https://172.20.220.21:8006)  
+- 📜 [Ver histórico de alterações](https://github.com/VIPs-com/proxmox-scripts/releases)  
+- ⚙️ [Workflow de automação](https://github.com/VIPs-com/proxmox-scripts/actions)  
 
 ---
 
