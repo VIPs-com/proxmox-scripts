@@ -128,6 +128,57 @@ chmod +x nome-do-script.sh
 
 ---
 
+## 🛠️ Ferramentas de Diagnóstico
+
+### 🔍 Script de Verificação de Rede
+
+**Arquivo:** `utils/verifica-rede.sh`
+
+**Funcionalidades:**
+- 📶 Teste de latência entre nós
+- 🔌 Verificação de portas essenciais (SSH, WebUI, Corosync)
+- 🌐 Checagem de DNS reverso
+
+**Como Usar:**
+```bash
+# Execução direta via curl:
+bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh)
+
+# Ou baixar e executar localmente:
+mkdir -p utils
+wget -O utils/verifica-rede.sh https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh
+chmod +x utils/verifica-rede.sh
+./utils/verifica-rede.sh
+```
+
+**Exemplo de Saída:**
+```
+🔍 Diagnóstico de Rede - [Data]
+----------------------------------------
+ℹ️  1/3 - Medição de Latência:
+✅ 172.20.220.20 → Latência média: 1.245ms
+✅ 172.20.220.21 → Latência média: 2.817ms
+
+ℹ️  2/3 - Verificando portas:
+🔧 Nó 172.20.220.20:
+✅ Porta 22 → Acessível
+✅ Porta 8006 → Acessível
+
+ℹ️  3/3 - Verificando DNS:
+✅ 172.20.220.20 → proxmox01.local
+❌ 172.20.220.21 → Sem resolução reversa
+
+📊 Resultado Final:
+❌ Problemas detectados
+ℹ️  Recomendação: Resolva os itens em vermelho
+----------------------------------------
+```
+
+**⚠️ Atenção:**  
+Edite as variáveis no início do script para refletir seus IPs antes de executar!
+
+---
+
 # Licença
 
 MIT License © VIPs-com
