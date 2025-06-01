@@ -131,3 +131,7 @@ chmod +x nome-do-script.sh
 # Licença
 
 MIT License © VIPs-com
+
+---
+
+![CHANGELOG Automation](https://github.com/VIPs-com/proxmox-scripts/actions/workflows/update-changelog.yml/badge.svg)
