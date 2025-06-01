@@ -1,6 +1,3 @@
------
-
-````markdown
 # 🚀 Scripts Proxmox VE 8 - Cluster Aurora/Luna <img src="assets/proxmox-icon.png" width="30">
 
 ![Version](https://img.shields.io/github/v/release/VIPs-com/proxmox-scripts?include_prereleases&style=flat-square)
@@ -64,113 +61,73 @@ Este script **DEVE SER EXECUTADO INDIVIDUALMENTE EM CADA NÓ** e **APÓS A CRIA�
 Execute este comando no Shell de cada nó Proxmox:
 ```bash
 curl -sL [https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/postinstall-aurora-luna.sh](https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/postinstall-aurora-luna.sh) | bash
-````
 
-**Método Alternativo com `wget`:**
+Método Alternativo com wget:
 Baixe o script e execute-o localmente em cada nó:
-
-```bash
 wget [https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/postinstall-aurora-luna.sh](https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/postinstall-aurora-luna.sh)
 chmod +x postinstall-aurora-luna.sh
 sudo ./postinstall-aurora-luna.sh
-```
 
-⚠️ **Lembrete:** Após a execução do script em cada nó, um **reboot é altamente recomendado** para aplicar todas as configurações (o script perguntará se você deseja reiniciar).
+⚠️ Lembrete: Após a execução do script em cada nó, um reboot é altamente recomendado para aplicar todas as configurações (o script perguntará se você deseja reiniciar).
 
------
+🔄 Troubleshooting (Resolução de Problemas)
+❌ Erro Comum	🛠️ Solução Sugerida
+"Falha no NTP"	Verifique se a porta UDP 123 (NTP) está aberta no firewall e se há conectividade externa (ex: ping google.com).
+"IP inválido"	Confira os IPs definidos em CLUSTER_PEER_IPS no script ou no arquivo /etc/proxmox-postinstall.conf se você o estiver utilizando.
+"Falha ao aplicar firewall"	Execute pve-firewall status ou journalctl -xeu pve-firewall para verificar logs e erros específicos do serviço de firewall.
+"Erro ao baixar pacotes"	Verifique a conectividade com a internet (ping ftp.debian.org) e se o comando apt update consegue acessar os repositórios.
+"Nó não consegue se juntar ao cluster"	Verifique o Passo 4 dos Pré-requisitos: O cluster deve ser criado manualmente antes de rodar o script. Verifique também o status do firewall (pve-firewall status) e a conectividade entre os nós (ping, nc -zv IP PORTA).
 
-## 🔄 Troubleshooting (Resolução de Problemas)
+🤝 Como Contribuir
+💡 Quer melhorar este projeto? Sua contribuição é bem-vinda!
 
-| ❌ Erro Comum | 🛠️ Solução Sugerida |
-|---|---|
-| "Falha no NTP" | Verifique se a porta UDP 123 (NTP) está aberta no firewall e se há conectividade externa (ex: `ping google.com`). |
-| "IP inválido" | Confira os IPs definidos em `CLUSTER_PEER_IPS` no script ou no arquivo `/etc/proxmox-postinstall.conf` se você o estiver utilizando. |
-| "Falha ao aplicar firewall" | Execute `pve-firewall status` ou `journalctl -xeu pve-firewall` para verificar logs e erros específicos do serviço de firewall. |
-| "Erro ao baixar pacotes" | Verifique a conectividade com a internet (`ping ftp.debian.org`) e se o comando `apt update` consegue acessar os repositórios. |
-| "Nó não consegue se juntar ao cluster" | **Verifique o Passo 4 dos Pré-requisitos:** O cluster deve ser criado manualmente *antes* de rodar o script. Verifique também o status do firewall (`pve-firewall status`) e a conectividade entre os nós (ping, `nc -zv IP PORTA`). |
+Faça um Fork deste repositório para sua conta GitHub.
+Clone o repositório para sua máquina local:
+git clone [https://github.com/SEU-USUARIO/proxmox-scripts.git](https://github.com/SEU-USUARIO/proxmox-scripts.git)
 
------
+Crie uma branch para sua melhoria ou correção:
+git checkout -b feature/minha-nova-funcao
 
-## 🤝 Como Contribuir
+Faça suas alterações no código.
+Envie um commit com uma mensagem clara e descritiva (use emojis para melhor organização):
+git commit -m "✨ Adiciona novo recurso X"
 
-💡 Quer melhorar este projeto? Sua contribuição é bem-vinda\!
+Abra um Pull Request no repositório original, explicando detalhadamente sua contribuição! 🚀
+🔗 Para mais informações sobre como contribuir no GitHub, consulte o Guia Oficial de Contribuição do GitHub.
 
-1.  **Faça um Fork** deste repositório para sua conta GitHub.
-2.  **Clone o repositório** para sua máquina local:
-    ```bash
-    git clone [https://github.com/SEU-USUARIO/proxmox-scripts.git](https://github.com/SEU-USUARIO/proxmox-scripts.git)
-    ```
-3.  **Crie uma branch** para sua melhoria ou correção:
-    ```bash
-    git checkout -b feature/minha-nova-funcao
-    ```
-4.  **Faça suas alterações** no código.
-5.  **Envie um commit** com uma mensagem clara e descritiva (use emojis para melhor organização):
-    ```bash
-    git commit -m "✨ Adiciona novo recurso X"
-    ```
-6.  **Faça o Push** da sua branch para o seu fork no GitHub:
-    ```bash
-    git push origin feature/minha-nova-funcao
-    ```
-7.  **Abra um Pull Request** no repositório original, explicando detalhadamente sua contribuição\! 🚀
-
-🔗 Para mais informações sobre como contribuir no GitHub, consulte o [Guia Oficial de Contribuição do GitHub](https://docs.github.com/en/get-started/quickstart/contributing-to-projects).
-
------
-
-## 🌐 Proxmox WebUI - Acesso Rápido
-
+🌐 Proxmox WebUI - Acesso Rápido
 Clique para acessar a interface web de cada nó:
 
-  * 🔹 [Aurora WebUI](https://172.20.220.20:8006)
-  * 🔹 [Luna WebUI](https://172.20.220.21:8006)
+🔹 Aurora WebUI
+🔹 Luna WebUI
+📷 Exemplo da Interface Web:
+(Se você tiver uma imagem da sua interface Proxmox, salve-a em assets/proxmox-interface-example.png no seu repositório)
 
-📷 **Exemplo da Interface Web:**
-*(Se você tiver uma imagem da sua interface Proxmox, salve-a em `assets/proxmox-interface-example.png` no seu repositório)*
-
------
-
-## 🚧 Roadmap do Projeto
-
+🚧 Roadmap do Projeto
 Confira o que está em desenvolvimento ou planejado para o futuro deste projeto:
 
-| 📌 Funcionalidade | Status |
-|---|---|
-| Melhorias na segurança do firewall | ✅ Concluído |
-| Automatização de verificações | ✅ Concluído |
-| Integração com monitoramento via Zabbix | 🚀 Em desenvolvimento |
-| Suporte ao Proxmox Backup Server | 🛠️ Planejado |
+📌 Funcionalidade	Status
+Melhorias na segurança do firewall	✅ Concluído
+Automatização de verificações	✅ Concluído
+Integração com monitoramento via Zabbix	🚀 Em desenvolvimento
+Suporte ao Proxmox Backup Server	🛠️ Planejado
 
------
+Exportar para as Planilhas
+📌 FAQ (Perguntas Frequentes)
+🔹 Preciso de acesso root para rodar o script?
+Sim, o script realiza configurações de sistema que exigem privilégios administrativos (usuário root).
 
-## 📌 FAQ (Perguntas Frequentes)
+🔹 Esse script suporta versões anteriores do Proxmox?
+Este script foi otimizado e testado especificamente para Proxmox VE 8.x. Embora algumas partes possam funcionar em versões anteriores, o comportamento ideal não é garantido e podem ocorrer erros.
 
-**🔹 Preciso de acesso root para rodar o script?**
-Sim, o script realiza configurações de sistema que exigem privilégios administrativos (usuário `root`).
+🔹 O script faz reboot automático?
+Não, o script pede confirmação antes de iniciar o processo de reinicialização do nó. Você tem a opção de adiar o reboot e fazê-lo manualmente mais tarde, se necessário.
 
-**🔹 Esse script suporta versões anteriores do Proxmox?**
-Este script foi otimizado e testado especificamente para **Proxmox VE 8.x**. Embora algumas partes possam funcionar em versões anteriores, o comportamento ideal não é garantido e podem ocorrer erros.
-
-**🔹 O script faz reboot automático?**
-Não, o script **pede confirmação** antes de iniciar o processo de reinicialização do nó. Você tem a opção de adiar o reboot e fazê-lo manualmente mais tarde, se necessário.
-
------
-
-## 🎯 Benchmark / Testes de Performance
-
-Para verificar o desempenho do seu nó Proxmox após a instalação e configuração, você pode usar o comando `pveperf` diretamente no Shell:
-
-```bash
+🎯 Benchmark / Testes de Performance
+Para verificar o desempenho do seu nó Proxmox após a instalação e configuração, você pode usar o comando pveperf diretamente no Shell:
 pveperf
-```
 
 Este comando fornece métricas detalhadas sobre o desempenho do disco, uso da CPU e RAM, permitindo que você valide as melhorias no sistema.
 
------
-
-## 📝 Licença
-
-Este projeto é de código aberto e está sob a licença [MIT](https://www.google.com/search?q=LICENSE). Para mais informações sobre os termos de uso e distribuição, consulte o arquivo `LICENSE` no repositório.
-
------
+📝 Licença
+Este projeto é de código aberto e está sob a licença MIT. Para mais informações sobre os termos de uso e distribuição, consulte o arquivo LICENSE no repositório.
