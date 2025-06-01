@@ -9,12 +9,12 @@
 
 ## 📚 Documentação & Recursos
 
-📌 **Links Rápidos**
+### 📌 Links Rápidos
 - 🔗 [Aurora WebUI](https://172.20.220.20:8006)
 - 🔗 [Luna WebUI](https://172.20.220.21:8006)
 - 📖 [Documentação Oficial Proxmox](https://pve.proxmox.com/wiki/Main_Page)
 
-📌 **Histórico de Alterações**
+### 📌 Histórico de Alterações
 - 📜 [CHANGELOG.md](CHANGELOG.md) - Histórico completo de mudanças
 - 🔄 ![CHANGELOG Auto-Updated](https://img.shields.io/badge/CHANGELOG-auto--updated-brightgreen)
 - 📦 ![GitHub Releases](https://img.shields.io/github/v/release/VIPs-com/proxmox-scripts?include_prereleases)
@@ -64,10 +64,12 @@ curl -sL [https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/postin
 
 Método Alternativo com wget:
 Baixe o script e execute-o localmente em cada nó:
+
+Bash
+
 wget [https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/postinstall-aurora-luna.sh](https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/postinstall-aurora-luna.sh)
 chmod +x postinstall-aurora-luna.sh
 sudo ./postinstall-aurora-luna.sh
-
 ⚠️ Lembrete: Após a execução do script em cada nó, um reboot é altamente recomendado para aplicar todas as configurações (o script perguntará se você deseja reiniciar).
 
 🔄 Troubleshooting (Resolução de Problemas)
@@ -78,20 +80,28 @@ sudo ./postinstall-aurora-luna.sh
 "Erro ao baixar pacotes"	Verifique a conectividade com a internet (ping ftp.debian.org) e se o comando apt update consegue acessar os repositórios.
 "Nó não consegue se juntar ao cluster"	Verifique o Passo 4 dos Pré-requisitos: O cluster deve ser criado manualmente antes de rodar o script. Verifique também o status do firewall (pve-firewall status) e a conectividade entre os nós (ping, nc -zv IP PORTA).
 
+Exportar para as Planilhas
 🤝 Como Contribuir
 💡 Quer melhorar este projeto? Sua contribuição é bem-vinda!
 
 Faça um Fork deste repositório para sua conta GitHub.
 Clone o repositório para sua máquina local:
+Bash
+
 git clone [https://github.com/SEU-USUARIO/proxmox-scripts.git](https://github.com/SEU-USUARIO/proxmox-scripts.git)
-
 Crie uma branch para sua melhoria ou correção:
-git checkout -b feature/minha-nova-funcao
+Bash
 
+git checkout -b feature/minha-nova-funcao
 Faça suas alterações no código.
 Envie um commit com uma mensagem clara e descritiva (use emojis para melhor organização):
-git commit -m "✨ Adiciona novo recurso X"
+Bash
 
+git commit -m "✨ Adiciona novo recurso X"
+Faça o Push da sua branch para o seu fork no GitHub:
+Bash
+
+git push origin feature/minha-nova-funcao
 Abra um Pull Request no repositório original, explicando detalhadamente sua contribuição! 🚀
 🔗 Para mais informações sobre como contribuir no GitHub, consulte o Guia Oficial de Contribuição do GitHub.
 
@@ -100,8 +110,7 @@ Clique para acessar a interface web de cada nó:
 
 🔹 Aurora WebUI
 🔹 Luna WebUI
-📷 Exemplo da Interface Web:
-(Se você tiver uma imagem da sua interface Proxmox, salve-a em assets/proxmox-interface-example.png no seu repositório)
+📷 Exemplo da Interface Web:(Se você tiver uma imagem da sua interface Proxmox, salve-a em assets/proxmox-interface-example.png no seu repositório para que ela apareça aqui)
 
 🚧 Roadmap do Projeto
 Confira o que está em desenvolvimento ou planejado para o futuro deste projeto:
@@ -125,8 +134,10 @@ Não, o script pede confirmação antes de iniciar o processo de reinicializaç�
 
 🎯 Benchmark / Testes de Performance
 Para verificar o desempenho do seu nó Proxmox após a instalação e configuração, você pode usar o comando pveperf diretamente no Shell:
-pveperf
 
+Bash
+
+pveperf
 Este comando fornece métricas detalhadas sobre o desempenho do disco, uso da CPU e RAM, permitindo que você valide as melhorias no sistema.
 
 📝 Licença
