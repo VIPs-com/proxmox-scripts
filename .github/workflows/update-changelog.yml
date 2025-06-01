@@ -1,4 +1,4 @@
-name: Update CHANGELOG and Release
+name: Update CHANGELOG
 
 on:
   workflow_dispatch:
@@ -20,70 +20,29 @@ jobs:
 
     - name: Setup Git
       run: |
-        git config --global user.name "VIPs.com"
+        git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
 
     - name: Update CHANGELOG
       run: |
-        # Verifica se o arquivo existe
         if [ ! -f CHANGELOG.md ]; then
-          echo "# Histórico de Alterações" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "> Gerado automaticamente por VIPs.com" >> CHANGELOG.md
+          echo "# Changelog" > CHANGELOG.md
           echo "" >> CHANGELOG.md
         fi
-
-        # Pega informações detalhadas
-        VERSION=$(grep -m1 "VERSION=" proxmox-postinstall-aurora-luna.sh | cut -d'"' -f2 || echo "1.0.0")
-        AUTHOR="VIPs.com"
-        COMMIT_URL="https://github.com/VIPs-com/proxmox-scripts/commit/$(git rev-parse HEAD)"
-        COMMIT_MSG=$(git log -1 --pretty=format:'%s')
         
-        # Define emoji com base na mensagem do commit
-        if echo "$COMMIT_MSG" | grep -qi "fix"; then
-          EMOJI="🐛 Correção"
-        elif echo "$COMMIT_MSG" | grep -qi "feat"; then
-          EMOJI="✨ Nova Feature"
-        elif echo "$COMMIT_MSG" | grep -qi "docs"; then
-          EMOJI="📚 Documentação"
-        elif echo "$COMMIT_MSG" | grep -qi "chore"; then
-          EMOJI="🔧 Manutenção"
-        else
-          EMOJI="📜 Atualização"
-        fi
-
-        # Detecta issues (ex.: #123 no commit)
-        ISSUE_NUM=$(echo "$COMMIT_MSG" | grep -o '#[0-9]*' | head -1 || echo "")
-        if [ -n "$ISSUE_NUM" ]; then
-          ISSUE_LINK="- Relacionado a: [$ISSUE_NUM](https://github.com/VIPs-com/proxmox-scripts/issues/${ISSUE_NUM#\#})"
-        fi
-
-        # Verifica se já existe entrada para hoje
-        if grep -q "## $(date +'%Y-%m-%d')" CHANGELOG.md; then
-          echo "✓ Entrada já existe para hoje. Pulando..."
+        TODAY=$(date +'%Y-%m-%d')
+        if grep -q "## \[$TODAY\]" CHANGELOG.md; then
+          echo "Entry already exists for today. Skipping..."
           exit 0
         fi
         
-        # Adiciona entrada com emoji dinâmico
-        sed -i "1i ## $EMOJI - v$VERSION ($(date +'%Y-%m-%d'))\n- **Descrição:** ${COMMIT_MSG}\n- **Por:** $AUTHOR\n${ISSUE_LINK}\n- [🔗 Ver alterações]($COMMIT_URL)\n" CHANGELOG.md
+        echo "## [$TODAY]" >> CHANGELOG.md
+        echo "### Changed" >> CHANGELOG.md
+        echo "- Automated update" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
 
     - name: Commit Changes
       run: |
         git add CHANGELOG.md
-        git commit -m "📜 Atualização automática do CHANGELOG (por VIPs.com)" || echo "Nenhuma mudança para commit"
+        git commit -m "📜 Auto-update CHANGELOG" || echo "No changes to commit"
         git push
-
-  create-release:
-    needs: update-changelog
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v3
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: "v$(grep -m1 "VERSION=" proxmox-postinstall-aurora-luna.sh | cut -d'"' -f2 || echo "1.0.0")"
-          body_path: CHANGELOG.md
-          draft: false
-          prerelease: false
