@@ -77,12 +77,17 @@ pveperf
 ## 🤝 Como Contribuir
 
 ```bash
+# 1. Clone o repositório
 git clone https://github.com/VIPs-com/proxmox-scripts.git
+
+# 2. Crie uma branch
 git checkout -b minha-feature
-# Faça suas melhorias
+
+# 3. Faça e commit suas alterações
 git commit -m "Minha contribuição"
+
+# 4. Envie para o repositório
 git push origin minha-feature
-# Abra um Pull Request no GitHub
 ```
 
 ---
