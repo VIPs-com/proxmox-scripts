@@ -129,6 +129,62 @@ chmod +x nome-do-script.sh
 ---
 
 
+# 🛠️ Proxmox Scripts
+
+Este repositório contém scripts úteis para automatizar e facilitar o processo de instalação, configuração e diagnóstico de ambientes Proxmox VE.
+
+## 📁 Estrutura
+
+- `postinstall-aurora-luna.sh` — Script de pós-instalação para otimizar e configurar nós Proxmox.
+- `utils/verifica-rede.sh` — Script de verificação de rede para checagens antes de instalar o cluster.
+
+---
+
+## 🔍 Script de Verificação de Rede
+
+**Arquivo:** `utils/verifica-rede.sh`
+
+Este script serve como uma ferramenta de **pré-verificação essencial** para o seu ambiente Proxmox VE. Ele deve ser executado **antes** do script principal de pós-instalação (`postinstall-aurora-luna.sh`) para garantir que sua rede e conectividade básica estejam funcionando corretamente.
+
+### Funcionalidades
+
+- 📶 **Teste de latência:** Mede a latência de ping entre os nós do seu cluster.
+- 🔌 **Verificação de portas essenciais:** Confere a acessibilidade de portas críticas como SSH (22), WebUI (8006) e as portas do Corosync (5404–5407).
+- 🌐 **Checagem de DNS reverso:** Verifica se a resolução reversa de DNS está configurada corretamente para os IPs dos seus nós.
+
+### Como Usar
+
+Execute este script diretamente no terminal de **cada nó Proxmox** para validar sua configuração de rede:
+
+```bash
+bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh)
+```
+
+Ou, se preferir, baixe e execute localmente:
+
+```bash
+mkdir -p utils
+wget -O utils/verifica-rede.sh https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh
+chmod +x utils/verifica-rede.sh
+./utils/verifica-rede.sh
+```
+
+---
+
+## 📌 Requisitos
+
+- Proxmox VE instalado
+- Acesso root ou sudo ao terminal
+- Conexão de rede funcional entre os nós do cluster
+
+## 🤝 Contribuições
+
+Sinta-se à vontade para abrir *Issues* ou enviar *Pull Requests* com melhorias.
+
+---
+
+© VIPs-com | Scripts para automação Proxmox
+
 
 ---
 
