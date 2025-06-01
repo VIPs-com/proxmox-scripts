@@ -8,8 +8,6 @@
 # 2. Todos os nós estão acessíveis via ping?
 # 3. Tem backup dos dados importantes?
 
-git commit -m "fix: corrige erro no script"  # Vai gerar 🐛 no CHANGELOG
-
 ######
 #
 # ✅ Instruções de uso local (alternativa ao método com 'curl'):
