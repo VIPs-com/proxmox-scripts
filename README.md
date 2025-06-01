@@ -55,4 +55,3 @@ Falha na conexão	Verifique sua rede
 Pacote não encontrado	Atualize os repositórios
 📄 Licença
 Distribuído sob licença MIT. Veja o arquivo LICENSE para detalhes.
-
