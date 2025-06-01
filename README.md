@@ -1,156 +1,77 @@
-# 🚀 Scripts Proxmox VE 8 - Cluster Aurora/Luna <img src="assets/proxmox-icon.png" width="30">
+# 🚀 Proxmox Scripts - Cluster Aurora/Luna
 
-![Version](https://img.shields.io/github/v/release/VIPs-com/proxmox-scripts?include_prereleases&style=flat-square)
-![CHANGELOG](https://img.shields.io/badge/CHANGELOG-auto--updated-brightgreen?style=flat-square)
-![GitHub Actions](https://img.shields.io/github/actions/workflow/status/VIPs-com/proxmox-scripts/update-changelog.yml?style=flat-square)
-![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+![Proxmox Version](https://img.shields.io/badge/Proxmox-8.x-orange)
+![Version](https://img.shields.io/github/v/release/VIPs-com/proxmox-scripts?include_prereleases)
+![CHANGELOG](https://img.shields.io/badge/CHANGELOG-auto--updated-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
----
-
-## 📚 Documentação & Recursos
-
-### 📌 Links Rápidos
-- 🔗 [Aurora WebUI](https://172.20.220.20:8006)
-- 🔗 [Luna WebUI](https://172.20.220.21:8006)
-- 📖 [Documentação Oficial Proxmox](https://pve.proxmox.com/wiki/Main_Page)
+> Scripts de automação para servidores **Proxmox VE** no cluster **Aurora/Luna**
 
 ---
 
-## 📜 Histórico de Alterações
-- 📄 [CHANGELOG.md](CHANGELOG.md) - Histórico completo de mudanças
-- 📦 Releases no GitHub: veja versões disponíveis
-- ✅ Auto-atualização via GitHub Actions
+## 📌 Script de Pós-Instalação
+
+**`postinstall-aurora-luna.sh`** – Configura automaticamente os nós do cluster:
+
+- **Aurora** – `172.20.220.20`  
+- **Luna** – `172.20.220.21`
 
 ---
 
-## 📌 `postinstall-aurora-luna.sh`
+### 🔥 Recursos Principais
 
-**Script de pós-instalação e configuração essencial para os nós Aurora e Luna do seu cluster Proxmox VE 8.**
+- 🛡️ Configuração automática de **firewall**
+- 🔒 Aplicação de **hardening SSH**
+- ⏱ Ativação da **sincronização NTP**
+- 🌐 Suporte às **VLANs**:
 
-### 🔥 Principais Recursos
-- ✔️ Configuração automática de firewall (cluster + VLANs)
-- ✔️ Hardening SSH (opcional)
-- ✔️ Sincronização NTP
-- ✔️ Ajuste de repositórios (ativa `no-subscription`)
-- ✔️ Suporte completo às VLANs
-
-| VLAN               | Finalidade                  |
-|--------------------|-----------------------------|
-| `172.20.220.0/24`  | Rede Principal do Cluster   |
-| `172.21.221.0/24`  | Gerenciamento Interno       |
-| `172.25.125.0/24`  | Rede Wi-Fi Arkadia          |
+| VLAN             | Propósito         |
+|------------------|-------------------|
+| `172.20.220.0/24` | Cluster principal |
+| `172.21.221.0/24` | Gerenciamento     |
+| `172.25.125.0/24` | Rede Wi-Fi        |
 
 ---
 
-## 🧩 Pré-requisitos
+## 🚀 Como Instalar
 
-1. Proxmox VE 8.x instalado nos nós.
-2. Acesso **root** via SSH ou WebUI.
-3. Conexão com a internet.
-4. **Cluster já criado manualmente via WebUI:**
+```bash
+# Método com curl (recomendado):
+curl -sL https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/proxmox-postinstall-aurora-luna.sh | bash
 
-```text
-Datacenter > Cluster > Create Cluster (primeiro nó)
-Datacenter > Cluster > Join Cluster (nos nós adicionais)
+# Método com wget:
+wget https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/proxmox-postinstall-aurora-luna.sh
+chmod +x proxmox-postinstall-aurora-luna.sh
+sudo ./proxmox-postinstall-aurora-luna.sh
 ```
 
-Execute o script **apenas após o cluster estar sincronizado e sem erros** no WebUI.
+---
+
+## 🔗 Links Úteis
+
+- [🌐 Acessar Aurora WebUI](https://172.20.220.20:8006)
+- [🌐 Acessar Luna WebUI](https://172.20.220.21:8006)
+- [📄 Histórico de alterações (CHANGELOG)](https://github.com/VIPs-com/proxmox-scripts/releases)
+- [⚙️ Workflow de automação (GitHub Actions)](https://github.com/VIPs-com/proxmox-scripts/actions)
 
 ---
 
-## ▶️ Como Executar
+## 🤝 Como Contribuir
 
-### Método 1: `curl` (recomendado)
 ```bash
-curl -sL https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/postinstall-aurora-luna.sh | bash
-```
-
-### Método 2: `wget` + execução manual
-```bash
-wget https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/postinstall-aurora-luna.sh
-chmod +x postinstall-aurora-luna.sh
-sudo ./postinstall-aurora-luna.sh
-```
-
-⚠️ Após a execução em cada nó, **reinicie o sistema** quando for solicitado.
-
----
-
-## 🧰 Troubleshooting (Resolução de Problemas)
-
-| Erro Comum                         | Solução                                                                 |
-|------------------------------------|--------------------------------------------------------------------------|
-| Falha no NTP                       | Verifique porta UDP 123 e conectividade externa.                         |
-| IP inválido                        | Revise `CLUSTER_PEER_IPS` no script ou no arquivo de config.             |
-| Erro no firewall                   | Rode `pve-firewall status` e/ou `journalctl -xeu pve-firewall`.          |
-| Falha ao baixar pacotes            | Teste com `ping google.com` e `apt update`.                              |
-| Nó não entra no cluster            | Verifique tokens e conectividade. Confirme que o cluster já foi criado.  |
-
----
-
-## 💡 Como Contribuir
-
-1. Faça um Fork deste repositório.
-2. Clone o Fork localmente:
-```bash
-git clone https://github.com/SEU-USUARIO/proxmox-scripts.git
+git clone https://github.com/VIPs-com/proxmox-scripts.git
 cd proxmox-scripts
-```
-3. Crie uma branch:
-```bash
-git checkout -b feature/nova-funcionalidade
-```
-4. Faça as alterações e envie:
-```bash
-git commit -m "✨ Nova funcionalidade X adicionada"
-git push origin feature/nova-funcionalidade
-```
-5. Abra um Pull Request explicando sua contribuição. 🚀
 
----
+git checkout -b minha-feature
 
-## 🌐 Acesso Rápido ao Proxmox WebUI
+# Faça suas melhorias
 
-- 🔹 [Aurora WebUI](https://172.20.220.20:8006)
-- 🔹 [Luna WebUI](https://172.20.220.21:8006)
-
-> (Adicione uma captura da interface em `assets/proxmox-interface-example.png` para visualização aqui)
-
----
-
-## 🧭 Roadmap do Projeto
-
-| Funcionalidade                         | Status         |
-|----------------------------------------|----------------|
-| Melhorias de segurança no firewall     | ✅ Concluído    |
-| Verificações automatizadas             | ✅ Concluído    |
-| Integração com Zabbix                  | 🚀 Em andamento|
-| Suporte ao Proxmox Backup Server       | 🛠️ Planejado    |
-
----
-
-## ❓ FAQ
-
-**🔹 Preciso de root para rodar o script?**  
-Sim. Ele altera configurações de sistema e firewall.
-
-**🔹 Funciona em versões anteriores ao Proxmox 8?**  
-Não oficialmente. O suporte é garantido apenas para 8.x.
-
-**🔹 O script reinicia o sistema?**  
-Ele pergunta antes de reiniciar. Você pode adiar se preferir.
-
----
-
-## 🧪 Benchmark (opcional)
-
-Rode no shell do Proxmox para avaliar o desempenho do seu nó:
-```bash
-pveperf
+git commit -m "Minha contribuição"
+git push origin minha-feature
 ```
 
+Depois, abra um **Pull Request** no GitHub!
+
 ---
 
-## 📝 Licença
-
-Distribuído sob licença [MIT](LICENSE). Uso livre para fins pessoais e comerciais, com atribuição.
+📬 *Sugestões, bugs ou melhorias? Sinta-se à vontade para abrir uma issue ou PR!*
