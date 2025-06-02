@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.2.3 - Foco no Essencial e Usabilidade)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.4 - Foco no Essencial e Usabilidade)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -69,9 +69,9 @@ log_ok() { echo -e "\n✅ $*" | tee -a "$LOG_FILE"; } # Adicionado para mensagen
 log_erro() { echo -e "\n❌ **ERRO**: $*" | tee -a "$LOG_FILE"; } # Adicionado para mensagens de erro (não críticas para abortar)
 
 log_cmd() {
-    echo -e "\n🔹 Executando Comando: $*" | tee -a "$LOG_FILE"
-    eval "$@" >> "$LOG_FILE" 2>&1
-    local status=$?
+    echo -e "\n🔹 Executando Comando: $*" | tee -a "<span class="math-inline">LOG\_FILE"
+eval "</span>@" >> "<span class="math-inline">LOG\_FILE" 2\>&1
+local status\=</span>?
     if [ $status -ne 0 ]; then
         echo "❌ **ERRO CRÍTICO** [$status]: Falha ao executar o comando: $*" | tee -a "$LOG_FILE"
         echo "O script será encerrado. Verifique o log em $LOG_FILE para mais detalhes." | tee -a "$LOG_FILE"
@@ -85,9 +85,9 @@ backup_file() {
     local file="$1"
     if [ -f "$file" ]; then
         local backup_dir="/var/backups/proxmox-postinstall"
-        mkdir -p "$backup_dir"
-        local timestamp=$(date +%Y%m%d%H%M%S)
-        local backup_path="$backup_dir/$(basename "$file").${timestamp}"
+        mkdir -p "<span class="math-inline">backup\_dir"
+local timestamp\=</span>(date +%Y%m%d%H%M%S)
+        local backup_path="<span class="math-inline">backup\_dir/</span>(basename "<span class="math-inline">file"\)\.</span>{timestamp}"
         log_info "📦 Fazendo backup de '$file' para '$backup_path'..."
         cp -p "$file" "$backup_path" >> "$LOG_FILE" 2>&1
         if [ $? -ne 0 ]; then
@@ -103,18 +103,16 @@ backup_file() {
 # Função para validar IP
 validate_ip() {
     local ip="$1"
-    if ! [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        log_erro "IP '$ip' inválido. Use formato 'XXX.XXX.XXX.XXX'."
-        exit 1
-    fi
-}
-
-# Nova função: Configura entradas em /etc/hosts para os nós do cluster
-configurar_hosts() {
-    log_info "📝 Configurando entradas em /etc/hosts para os nós do cluster..."
-    backup_file "/etc/hosts" # Faz backup do /etc/hosts antes de modificar
-
-    for node_entry in "${CLUSTER_NODES_CONFIG[@]}"; do
+    if ! [[ "<span class="math-inline">ip" \=\~ ^\[0\-9\]\{1,3\}\\\.\[0\-9\]\{1,3\}\\\.\[0\-9\]\{1,3\}\\\.\[0\-9\]\{1,3\}</span> ]]; then
+        log_erro "IP '<span class="math-inline">ip' inválido\. Use formato 'XXX\.XXX\.XXX\.XXX'\."
+exit 1
+fi
+\}
+\# Nova função\: Configura entradas em /etc/hosts para os nós do cluster
+configurar\_hosts\(\) \{
+log\_info "📝 Configurando entradas em /etc/hosts para os nós do cluster\.\.\."
+backup\_file "/etc/hosts" \# Faz backup do /etc/hosts antes de modificar
+for node\_entry in "</span>{CLUSTER_NODES_CONFIG[@]}"; do
         # Divide a string "IP HOSTNAME" em variáveis separadas
         read -r ip hostname <<< "$node_entry"
 
@@ -122,7 +120,7 @@ configurar_hosts() {
         validate_ip "$ip"
 
         # Verifica se a entrada IP HOSTNAME já existe exatamente como queremos
-        if ! grep -qE "^$ip\s+$hostname(\s+|$)" /etc/hosts; then
+        if ! grep -qE "^$ip\s+<span class="math-inline">hostname\(\\s\+\|</span>)" /etc/hosts; then
             # Se o IP existe mas está associado a outro hostname, remove a linha antiga
             if grep -qE "^$ip\s+" /etc/hosts; then
                 log_info "Removendo entrada existente para IP '$ip' em /etc/hosts antes de adicionar o hostname correto."
@@ -140,26 +138,24 @@ configurar_hosts() {
 
 # Função para exibir ajuda
 show_help() {
-    echo "Uso: $0 [OPÇÃO]"
-    echo "Script para pós-instalação e configuração inicial de um nó Proxmox VE 8."
-    echo ""
-    echo "Opções:"
-    echo "  -h, --help    Mostra esta mensagem de ajuda e sai."
-    echo "  --skip-lock   Ignora a verificação de arquivo de lock, permitindo múltiplas execuções (NÃO RECOMENDADO)."
-    echo ""
-    echo "Variáveis de configuração podem ser definidas em /etc/proxmox-postinstall.conf"
-    echo "Se este arquivo não existir, o script tentará baixá-lo de um repositório GitHub."
-    echo "Exemplo: CLUSTER_NETWORK=\"192.168.1.0/24\""
-    echo "         CLUSTER_NODES_CONFIG=(\"192.168.1.10 node1\" \"192.168.1.11 node2\")" # Atualizado
-    echo "         TIMEZONE=\"America/New_York\""
-    exit 0
-}
-
-# --- PROCESSAMENTO DE OPÇÕES E CARREGAMENTO DE CONFIGURAÇÃO EXTERNA ---
-
-# Processa opções de linha de comando
-SKIP_LOCK=false
-for arg in "$@"; do
+    echo "Uso: <span class="math-inline">0 \[OPÇÃO\]"
+echo "Script para pós\-instalação e configuração inicial de um nó Proxmox VE 8\."
+echo ""
+echo "Opções\:"
+echo "  \-h, \-\-help    Mostra esta mensagem de ajuda e sai\."
+echo "  \-\-skip\-lock   Ignora a verificação de arquivo de lock, permitindo múltiplas execuções \(NÃO RECOMENDADO\)\."
+echo ""
+echo "Variáveis de configuração podem ser definidas em /etc/proxmox\-postinstall\.conf"
+echo "Se este arquivo não existir, o script tentará baixá\-lo de um repositório GitHub\."
+echo "Exemplo\: CLUSTER\_NETWORK\=\\"192\.168\.1\.0/24\\""
+echo "         CLUSTER\_NODES\_CONFIG\=\(\\"192\.168\.1\.10 node1\\" \\"192\.168\.1\.11 node2\\"\)" \# Atualizado
+echo "         TIMEZONE\=\\"America/New\_York\\""
+exit 0
+\}
+\# \-\-\- PROCESSAMENTO DE OPÇÕES E CARREGAMENTO DE CONFIGURAÇÃO EXTERNA \-\-\-
+\# Processa opções de linha de comando
+SKIP\_LOCK\=false
+for arg in "</span>@"; do
     case "$arg" in
         -h|--help) show_help ;;
         --skip-lock) SKIP_LOCK=true ;;
@@ -216,25 +212,23 @@ check_dependency() {
         log_erro "O comando '$cmd' não foi encontrado. Por favor, instale-o (ex: apt install -y $cmd) e re-execute o script."
         exit 1
     fi
-    log_info "✅ Dependência '$cmd' verificada."
-}
-check_dependency "curl"
-check_dependency "ping"
-check_dependency "nc" # Netcat, usado para os testes de porta (apt install -y netcat-traditional ou netcat-openbsd)
-
-# Chama a nova função para configurar o /etc/hosts
-configurar_hosts
-
-log_info "🔍 Validando formato dos IPs e máscara de rede..."
-# Validar cada IP dos nós do cluster
-for node_entry in "${CLUSTER_NODES_CONFIG[@]}"; do
+    log_info "✅ Dependência '<span class="math-inline">cmd' verificada\."
+\}
+check\_dependency "curl"
+check\_dependency "ping"
+check\_dependency "nc" \# Netcat, usado para os testes de porta \(apt install \-y netcat\-traditional ou netcat\-openbsd\)
+\# Chama a nova função para configurar o /etc/hosts
+configurar\_hosts
+log\_info "🔍 Validando formato dos IPs e máscara de rede\.\.\."
+\# Validar cada IP dos nós do cluster
+for node\_entry in "</span>{CLUSTER_NODES_CONFIG[@]}"; do
     read -r ip hostname <<< "$node_entry"
     validate_ip "$ip"
 done
 log_info "✅ Formato dos IPs em CLUSTER_NODES_CONFIG verificado."
 
 # Validar formato da rede (ex: 172.20.220.0/24)
-if ! [[ "$CLUSTER_NETWORK" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; then
+if ! [[ "<span class="math-inline">CLUSTER\_NETWORK" \=\~ ^\[0\-9\]\{1,3\}\\\.\[0\-9\]\{1,3\}\\\.\[0\-9\]\{1,3\}\\\.\[0\-9\]\{1,3\}/\[0\-9\]\{1,2\}</span> ]]; then
     log_erro "Formato de rede inválido em CLUSTER_NETWORK. Use 'IP/MASK' (ex: 172.20.220.0/24)."
     exit 1
 fi
@@ -242,32 +236,30 @@ log_info "✅ Formato de CLUSTER_NETWORK verificado."
 
 log_info "🔍 Verificando conectividade de rede com os repositórios Debian..."
 ping -c 4 ftp.debian.org &>/dev/null
-if [ $? -ne 0 ]; then
-    log_info "⚠️ **AVISO**: Não foi possível pingar 'ftp.debian.org'. A conectividade com a internet pode estar comprometida. As atualizações e instalações podem falhar."
+if [ <span class="math-inline">? \-ne 0 \]; then
+log\_info "⚠️ \*\*AVISO\*\*\: Não foi possível pingar 'ftp\.debian\.org'\. A conectividade com a internet pode estar comprometida\. As atualizações e instalações podem falhar\."
 else
-    log_info "✅ Conectividade com repositórios Debian OK."
+log\_info "✅ Conectividade com repositórios Debian OK\."
 fi
-
-log_info "🔍 Verificando a versão do Proxmox VE..."
-PVE_VERSION=$(pveversion | grep -oP 'pve-manager/\K\d+\.\d+') # Extrai "8.x"
+log\_info "🔍 Verificando a versão do Proxmox VE\.\.\."
+PVE\_VERSION\=</span>(pveversion | grep -oP 'pve-manager/\K\d+\.\d+') # Extrai "8.x"
 REQUIRED_MAJOR_VERSION=8
 
 if (( $(echo "$PVE_VERSION" | cut -d'.' -f1) < $REQUIRED_MAJOR_VERSION )); then
     log_erro "Este script requer Proxmox VE versão $REQUIRED_MAJOR_VERSION.x ou superior. Versão atual detectada: $PVE_VERSION. Não é compatível."
     exit 1
 elif (( $(echo "$PVE_VERSION" | cut -d'.' -f1) > $REQUIRED_MAJOR_VERSION )); then
-    log_info "⚠️ **AVISO**: Este script foi testado para Proxmox VE $REQUIRED_MAJOR_VERSION.x. Versão $PVE_VERSION pode requerer ajustes ou não ser totalmente compatível."
-    read -p "Continuar mesmo assim? [s/N] " -n 1 -r -t 10
-    echo # Nova linha após a resposta do usuário
-    REPLY=${REPLY:-N}
-    [[ ! $REPLY =~ ^[Ss]$ ]] && { log_info "Script abortado pelo usuário."; exit 0; }
+    log_info "⚠️ **AVISO**: Este script foi testado para Proxmox VE $REQUIRED_MAJOR_VERSION.x. Versão <span class="math-inline">PVE\_VERSION pode requerer ajustes ou não ser totalmente compatível\."
+read \-p "Continuar mesmo assim? \[s/N\] " \-n 1 \-r \-t 10
+echo \# Nova linha após a resposta do usuário
+REPLY\=</span>{REPLY:-N}
+    [[ ! <span class="math-inline">REPLY \=\~ ^\[Ss\]</span> ]] && { log_info "Script abortado pelo usuário."; exit 0; }
 else
-    log_info "✅ Versão do Proxmox VE ($PVE_VERSION) compatível."
+    log_info "✅ Versão do Proxmox VE (<span class="math-inline">PVE\_VERSION\) compatível\."
 fi
-
-log_info "🔍 Verificando recursos de hardware básicos..."
-MIN_RAM_GB=4 # Mínimo recomendado de RAM em GB para um nó Proxmox VE
-RAM_AVAILABLE_GB=$(free -g | awk '/Mem:/ {print $2}')
+log\_info "🔍 Verificando recursos de hardware básicos\.\.\."
+MIN\_RAM\_GB\=4 \# Mínimo recomendado de RAM em GB para um nó Proxmox VE
+RAM\_AVAILABLE\_GB\=</span>(free -g | awk '/Mem:/ {print $2}')
 if (( RAM_AVAILABLE_GB < MIN_RAM_GB )); then
     log_info "⚠️ **AVISO**: Pouca RAM detectada ($RAM_AVAILABLE_GB GB). Mínimo recomendado para Proxmox VE é $MIN_RAM_GB GB. O desempenho pode ser afetado."
 else
@@ -302,47 +294,39 @@ if [ $? -ne 0 ]; then
     # Tenta sincronizar com ntpdate e registra qualquer erro, com múltiplos fallbacks
     ntpdate -s pool.ntp.org >> "$LOG_FILE" 2>&1 \
     || ntpdate -s 0.pool.ntp.org >> "$LOG_FILE" 2>&1 \
-    || ntpdate -s 1.pool.ntp.org >> "$LOG_FILE" 2>&1 \
-    || log_erro 'Falha grave ao sincronizar com ntpdate após várias tentativas. Verifique a conectividade de rede e as configurações de NTP.'
+    || ntpdate -s 1.pool.ntp.org >> "<span class="math-inline">LOG\_FILE" 2\>&1 \\
+\|\| log\_erro 'Falha grave ao sincronizar com ntpdate após várias tentativas\. Verifique a conectividade de rede e as configurações de NTP\.'
 else
-    log_info "✅ Sincronização NTP bem-sucedida."
+log\_info "✅ Sincronização NTP bem\-sucedida\."
 fi
-
----
-
-# **Fase 3: Gerenciamento de Repositórios e Atualizações
-
-log_info "🗑️ Desabilitando repositório de subscrição e habilitando repositório PVE no-subscription..."
-# Faça backup de arquivos de lista de apt antes de modificar
-backup_file "/etc/apt/sources.list.d/pve-enterprise.list"
-backup_file "/etc/apt/sources.list"
-backup_file "/etc/apt/sources.list.d/pve-no-subscription.list"
-
-# CORREÇÃO: Verifica se o arquivo existe antes de tentar modificá-lo
-if [ -f "/etc/apt/sources.list.d/pve-enterprise.list" ]; then
-    log_info "Comentando a linha do pve-enterprise.list para desabilitar o repositório de subscrição."
-    log_cmd "sed -i 's/^deb/#deb/' /etc/apt/sources.list.d/pve-enterprise.list"
+\-\-\-
+\# \*\*Fase 3\: Gerenciamento de Repositórios e Atualizações
+log\_info "🗑️ Desabilitando repositório de subscrição e habilitando repositório PVE no\-subscription\.\.\."
+\# Faça backup de arquivos de lista de apt antes de modificar
+backup\_file "/etc/apt/sources\.list\.d/pve\-enterprise\.list"
+backup\_file "/etc/apt/sources\.list"
+backup\_file "/etc/apt/sources\.list\.d/pve\-no\-subscription\.list"
+\# CORREÇÃO\: Verifica se o arquivo existe antes de tentar modificá\-lo
+if \[ \-f "/etc/apt/sources\.list\.d/pve\-enterprise\.list" \]; then
+log\_info "Comentando a linha do pve\-enterprise\.list para desabilitar o repositório de subscrição\."
+log\_cmd "sed \-i 's/^deb/\#deb/' /etc/apt/sources\.list\.d/pve\-enterprise\.list"
 else
-    log_info "ℹ️ Arquivo /etc/apt/sources.list.d/pve-enterprise.list não encontrado. Nenhuma ação necessária para desabilitar o repositório de subscrição."
+log\_info "ℹ️ Arquivo /etc/apt/sources\.list\.d/pve\-enterprise\.list não encontrado\. Nenhuma ação necessária para desabilitar o repositório de subscrição\."
 fi
-
-
-# Adiciona/sobrescreve os repositórios Debian padrão
-log_cmd "echo 'deb http://ftp.debian.org/debian bookworm main contrib' > /etc/apt/sources.list"
-log_cmd "echo 'deb http://ftp.debian.org/debian bookworm-updates main contrib' >> /etc/apt/sources.list"
-log_cmd "echo 'deb http://security.debian.org/debian-security bookworm-security main contrib' >> /etc/apt/sources.list"
-# Adiciona o repositório Proxmox VE "no-subscription"
-log_cmd "echo 'deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription' > /etc/apt/sources.list.d/pve-no-subscription.list"
-
-log_info "🔄 Atualizando listas de pacotes e o sistema operacional..."
-log_cmd "apt update"
-log_cmd "apt dist-upgrade -y"   # Atualiza todos os pacotes e resolve dependências
-log_cmd "apt autoremove -y"     # Remove pacotes órfãos
-log_cmd "apt clean"             # Limpa o cache de pacotes
-
-log_info "🧹 Removendo o aviso de assinatura Proxmox VE do WebUI (se não possuir uma licença ativa)..."
-# Cria um hook para APT que modifica o arquivo JS do WebUI
-log_cmd "echo \"DPkg::Post-Invoke { \\\"dpkg -V proxmox-widget-toolkit | grep -q '/proxmoxlib.js$'; if [ \\\$? -eq 1 ]; then sed -i '/.*data.status.*{/{s/\\!//;s/active/NoMoreNagging/}' /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js; fi\\\"; };\" > /etc/apt/apt.conf.d/no-nag-script"
+\# Adiciona/sobrescreve os repositórios Debian padrão
+log\_cmd "echo 'deb http\://ftp\.debian\.org/debian bookworm main contrib' \> /etc/apt/sources\.list"
+log\_cmd "echo 'deb http\://ftp\.debian\.org/debian bookworm\-updates main contrib' \>\> /etc/apt/sources\.list"
+log\_cmd "echo 'deb http\://security\.debian\.org/debian\-security bookworm\-security main contrib' \>\> /etc/apt/sources\.list"
+\# Adiciona o repositório Proxmox VE "no\-subscription"
+log\_cmd "echo 'deb http\://download\.proxmox\.com/debian/pve bookworm pve\-no\-subscription' \> /etc/apt/sources\.list\.d/pve\-no\-subscription\.list"
+log\_info "🔄 Atualizando listas de pacotes e o sistema operacional\.\.\."
+log\_cmd "apt update"
+log\_cmd "apt dist\-upgrade \-y"   \# Atualiza todos os pacotes e resolve dependências
+log\_cmd "apt autoremove \-y"     \# Remove pacotes órfãos
+log\_cmd "apt clean"             \# Limpa o cache de pacotes
+log\_info "🧹 Removendo o aviso de assinatura Proxmox VE do WebUI \(se não possuir uma licença ativa\)\.\.\."
+\# Cria um hook para APT que modifica o arquivo JS do WebUI
+log\_cmd "echo \\"DPkg\:\:Post\-Invoke \{ \\\\\\"dpkg \-V proxmox\-widget\-toolkit \| grep \-q '/proxmoxlib\.js</span>'; if [ \\\$? -eq 1 ]; then sed -i '/.*data.status.*{/{s/\\!//;s/active/NoMoreNagging/}' /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js; fi\\\"; };\" > /etc/apt/apt.conf.d/no-nag-script"
 # Reinstala o pacote para aplicar a modificação imediatamente (ou após futuras atualizações do pacote)
 log_cmd "apt --reinstall install -y proxmox-widget-toolkit"
 log_info "✅ Aviso de assinatura removido do WebUI (se aplicável)."
@@ -362,7 +346,7 @@ done
 log_info "✅ Verificação de portas concluída."
 
 log_info "🛡️ Configurando o firewall do Proxmox VE com regras específicas..."
-# REMOVIDO: log_cmd "pve-firewall stop" # REMOVIDO: Este comando impedia os "rule --add" de funcionar.
+# REMOVIDO: log_cmd "pve-firewall stop" # ESTA LINHA FOI REMOVIDA DEFINITIVAMENTE!
 
 # Regras para permitir acesso ao WebUI (porta 8006) e SSH (porta 22) apenas das redes locais
 log_info "Permitindo acesso ao WebUI (8006) e SSH (22) apenas das redes locais..."
@@ -387,28 +371,22 @@ log_cmd "pve-firewall rule --add $CLUSTER_NETWORK --proto tcp --dport 2224 --acc
 
 # Permitir tráfego ICMP (ping) entre os nós do cluster para facilitar diagnósticos
 log_info "Permitindo tráfego ICMP (ping) na rede do cluster para facilitar diagnósticos futuros..."
-log_cmd "pve-firewall rule --add $CLUSTER_NETWORK --proto icmp --accept --comment 'Permitir ping entre os nós do cluster'"
-
-# Regra para permitir tráfego de SAÍDA para NTP (servidores externos)
-log_info "Permitindo tráfego de saída para servidores NTP (porta UDP 123)..."
-log_cmd "pve-firewall rule --action ACCEPT --direction OUT --proto udp --dport 123 --comment 'Permitir saída para NTP'"
-
-# Regra final: Bloquear todo o tráfego não explicitamente permitido (default deny)
-log_info "Aplicando regra de bloqueio padrão para todo o tráfego não autorizado..."
-log_cmd "pve-firewall rule --add 0.0.0.0/0 --drop --comment 'Bloquear tráfego não autorizado por padrão'"
-
-log_info "Ativando e iniciando o serviço de firewall do Proxmox VE..."
-log_cmd "pve-firewall enable"
-log_cmd "pve-firewall start"
-
----
-
-# Fase 5: Hardening de Segurança (Opcional)
-
-read -p "🔒 Deseja aplicar hardening de segurança (desativar login de root por senha e password authentication)? [s/N] " -n 1 -r -t 10
-echo # Nova linha após a resposta
-REPLY=${REPLY:-N}
-if [[ $REPLY =~ ^[Ss]$ ]]; then
+log_cmd "pve-firewall rule --add <span class="math-inline">CLUSTER\_NETWORK \-\-proto icmp \-\-accept \-\-comment 'Permitir ping entre os nós do cluster'"
+\# Regra para permitir tráfego de SAÍDA para NTP \(servidores externos\)
+log\_info "Permitindo tráfego de saída para servidores NTP \(porta UDP 123\)\.\.\."
+log\_cmd "pve\-firewall rule \-\-action ACCEPT \-\-direction OUT \-\-proto udp \-\-dport 123 \-\-comment 'Permitir saída para NTP'"
+\# Regra final\: Bloquear todo o tráfego não explicitamente permitido \(default deny\)
+log\_info "Aplicando regra de bloqueio padrão para todo o tráfego não autorizado\.\.\."
+log\_cmd "pve\-firewall rule \-\-add 0\.0\.0\.0/0 \-\-drop \-\-comment 'Bloquear tráfego não autorizado por padrão'"
+log\_info "Ativando e iniciando o serviço de firewall do Proxmox VE\.\.\."
+log\_cmd "pve\-firewall enable"
+log\_cmd "pve\-firewall start"
+\-\-\-
+\# Fase 5\: Hardening de Segurança \(Opcional\)
+read \-p "🔒 Deseja aplicar hardening de segurança \(desativar login de root por senha e password authentication\)? \[s/N\] " \-n 1 \-r \-t 10
+echo \# Nova linha após a resposta
+REPLY\=</span>{REPLY:-N}
+if [[ <span class="math-inline">REPLY \=\~ ^\[Ss\]</span> ]]; then
     log_info "🔒 Aplicando hardening SSH..."
     backup_file "/etc/ssh/sshd_config"
     log_cmd "sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config"
@@ -428,7 +406,7 @@ install_optional_tools() {
     read -p "📦 Deseja instalar ferramentas adicionais úteis (ex: qemu-guest-agent, ifupdown2, git, htop, smartmontools)? [s/N] " -n 1 -r -t 10
     echo # Nova linha após a resposta
     REPLY=${REPLY:-N}
-    if [[ $REPLY =~ ^[Ss]$ ]]; then
+    if [[ <span class="math-inline">REPLY \=\~ ^\[Ss\]</span> ]]; then
         log_info "Instalando pacotes adicionais..."
         log_cmd "apt install -y qemu-guest-agent ifupdown2 git htop smartmontools"
         log_info "✅ Pacotes adicionais instalados."
@@ -458,100 +436,4 @@ for node_entry in "${CLUSTER_NODES_CONFIG[@]}"; do
 
     # Obtém o IP principal do próprio nó para evitar testar a si mesmo
     # Adaptação para obter o IP da interface que está na CLUSTER_NETWORK (útil se houver múltiplas interfaces)
-    CURRENT_NODE_IP=$(ip -4 addr show dev $(ip r get $CLUSTER_NETWORK | awk '{print $3; exit}') 2>/dev/null | grep -oP 'inet \K[\d.]+')
-
-    # Fallback se a interface principal da CLUSTER_NETWORK não for encontrada, pega o primeiro IP
-    if [ -z "$CURRENT_NODE_IP" ]; then
-        CURRENT_NODE_IP=$(hostname -I | awk '{print $1}')
-    fi
-
-    if [ "$PEER_IP" = "$CURRENT_NODE_IP" ]; then
-        log_info "Pulando teste de conectividade para o próprio nó ($PEER_HOSTNAME - $PEER_IP)."
-        continue # Pula o teste se o IP for o do próprio nó
-    fi
-
-    log_info "Testando conexão com o nó $PEER_HOSTNAME ($PEER_IP)..."
-    if nc -zv "$PEER_IP" 5404 &>/dev/null; then
-        log_info "✅ Conexão Corosync com $PEER_HOSTNAME ($PEER_IP) (porta 5404) OK."
-    else
-        log_erro "Conexão Corosync com $PEER_HOSTNAME ($PEER_IP) (porta 5404) falhou. Verifique as regras de firewall e a rede."
-    fi
-    if nc -zv "$PEER_IP" 2224 &>/dev/null; then
-        log_info "✅ Conexão pve-cluster com $PEER_HOSTNAME ($PEER_IP) (porta 2224) OK."
-    else
-        log_erro "Conexão pve-cluster com $PEER_HOSTNAME ($PEER_IP) (porta 2224) falhou. Verifique as regras de firewall e a rede."
-    fi
-    # Teste de ping para a nova regra ICMP
-    if ping -c 1 -W 1 "$PEER_IP" &>/dev/null; then
-        log_info "✅ Ping com $PEER_HOSTNAME ($PEER_IP) OK."
-    else
-        log_erro "Ping com $PEER_HOSTNAME ($PEER_IP) falhou. Verifique as regras de firewall (ICMP) e a conectividade de rede."
-    fi
-done
-
-log_info "🌍 Testando conexão externa (internet) via HTTPS..."
-if nc -zv google.com 443 &>/dev/null; then
-    log_info "✅ Conexão externa via HTTPS (google.com:443) OK."
-else
-    log_info "⚠️ **AVISO**: Falha na conexão externa via HTTPS. Verifique as regras de saída do firewall e a conectividade geral com a internet."
-fi
-
-log_info "🧼 Limpando possíveis resíduos de execuções anteriores ou arquivos temporários..."
-# Exemplo de remoção do hook de "no-nag-script" se ele não for mais desejado como permanente
-# MANTENDO o hook, ele se auto-corrige. Se você quiser remover o hook completamente após a primeira execução:
-# log_cmd "rm -f /etc/apt/apt.conf.d/no-nag-script"
-log_info "✅ Limpeza de resíduos concluída."
-
-log_info "🧹 Limpando logs de pós-instalação antigos (com mais de 15 dias) em /var/log/..."
-# Encontra e remove logs mais antigos que 15 dias
-log_cmd "find /var/log -name \"proxmox-postinstall-*.log\" -mtime +15 -exec rm {} \\;"
-log_info "✅ Limpeza de logs antigos concluída."
-
-# Cálculo do tempo total de execução
-END_TIME=$(date +%s)
-ELAPSED_TIME=$((END_TIME - START_TIME))
-
-log_info "✅ **FINALIZADO**: Configuração concluída com sucesso no nó **$NODE_NAME** em $(date)."
-log_info "⏳ Tempo total de execução do script: **$ELAPSED_TIME segundos**."
-log_info "📋 O log detalhado de todas as operações está disponível em: **$LOG_FILE**."
-
----
-
-# Resumo da Configuração e Próximos Passos
-
-log_info "📝 **RESUMO DA CONFIGURAÇÃO E PRÓXIMOS PASSOS PARA SEU HOMELAB**"
-log_info "---------------------------------------------------------"
-log_info "✔️ Nó configurado: **$NODE_NAME**"
-log_info "✔️ Firewall Proxmox VE ativo com regras para:"
-log_info "    - Acesso ao WebUI (porta 8006) das redes internas"
-log_info "    - Acesso SSH (porta 22) das redes internas"
-log_info "    - Comunicação interna do cluster (Corosync: 5404-5405, pve-cluster: 2224) na rede '$CLUSTER_NETWORK'"
-log_info "    - Ping (ICMP) entre os nós do cluster"
-log_info "    - Acesso de saída para NTP e Internet (HTTPS)"
-log_info "✔️ Hardening SSH (desativa login root por senha): $(grep -q "PermitRootLogin prohibit-password" /etc/ssh/sshd_config &>/dev/null && echo "Aplicado" || echo "Não aplicado")"
-log_info "✔️ NTP sincronizado: $(timedatectl show --property=NTPSynchronized --value &>/dev/null && echo "Sim" || echo "Não")" # Verifica se NTP está sincronizado
-log_info "✔️ Repositórios atualizados: No-Subscription Proxmox VE e Debian Bookworm"
-log_info "✔️ Arquivo /etc/hosts configurado para os nós do cluster." # Adicionado
-log_info "---------------------------------------------------------"
-log_info "🔍 **PRÓXIMOS PASSOS CRUCIAIS (MANUAIS)**:"
-log_info "1.  **REINICIE O NÓ**: Algumas configurações (especialmente de rede e SSH) só terão efeito total após o reinício. **Isso é fundamental!**"
-log_info "2.  **CRIE O CLUSTER (Primeiro Nó)**: No WebUI do seu primeiro nó, vá em **Datacenter > Cluster > Create Cluster**. Defina um nome para o cluster (ex: Aurora-Luna-Cluster)."
-log_info "3.  **ADICIONE OUTROS NÓS AO CLUSTER**: Nos demais nós, no WebUI, vá em **Datacenter > Cluster > Join Cluster**. Use as informações do primeiro nó (token) para adicioná-los."
-log_info "4.  **CONFIGURE STORAGES**: Após o cluster estar funcional, configure seus storages (LVM-Thin, ZFS, NFS, Ceph, etc.) conforme sua necessidade para armazenar VMs/CTs e ISOs."
-log_info "5.  **CRIE CHAVES SSH (se aplicou hardening)**: Se você aplicou o hardening SSH, configure suas chaves SSH para acesso root antes de fechar a sessão atual, para garantir acesso futuro."
-log_info "---------------------------------------------------------"
-
-# --- REINÍCIO RECOMENDADO ---
-echo
-read -p "⟳ **REINÍCIO ALTAMENTE RECOMENDADO**: Para garantir que todas as configurações sejam aplicadas, é **fundamental** reiniciar o nó. Deseja reiniciar agora? [s/N] " -n 1 -r -t 15
-echo # Adiciona uma nova linha após a resposta do usuário ou timeout
-
-# Define 'N' como padrão se nada for digitado ou se houver timeout
-REPLY=${REPLY:-N}
-
-if [[ $REPLY =~ ^[Ss]$ ]]; then
-    log_info "🔄 Reiniciando o nó **$NODE_NAME** agora..."
-    log_cmd "reboot"
-else
-    log_info "ℹ️ Reinício adiado. Lembre-se de executar 'reboot' manualmente no nó **$NODE_NAME** o mais rápido possível para aplicar todas as todas as mudanças."
-fi
+    CURRENT_NODE_IP
