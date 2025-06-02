@@ -155,6 +155,15 @@ Este script serve como uma ferramenta de **pré-verificação essencial** para o
 
 Execute este script diretamente no terminal de **cada nó Proxmox** para validar sua configuração de rede:
 
+---
+
+## Pré-Requisitos Mínimos
+- Caso não tenha curl/wget, execute manualmente:
+  ```bash
+  apt-get update && apt-get install -y curl
+
+---
+
 ### 1. Execução rápida via `curl`:
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh || echo "echo '❌ Falha ao baixar o script'; exit 1")
