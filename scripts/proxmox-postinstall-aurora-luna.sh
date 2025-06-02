@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (v.11 - Ajuste Final Firewall - Restart)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (v.12 - Correção Separador Localnet)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -445,9 +445,8 @@ log_info "Configurando 'localnet' para as VLANs internas no firewall do cluster 
 CLUSTER_FW_FILE="/etc/pve/firewall/cluster.fw"
 backup_file "$CLUSTER_FW_FILE"
 
-# Verifica se o arquivo cluster.fw existe, se não, cria-o.
-# Se já existir e contiver uma seção [OPTIONS], insere as localnets nela.
-# Caso contrário, sobrescreve o arquivo com um novo [OPTIONS] e as localnets.
+# Redes para serem adicionadas ao localnet, separadas por ponto e vírgula
+LOCAL_NETWORKS_LIST="172.20.220.0/24;172.21.221.0/24;172.25.125.0/24"
 
 if [ -f "$CLUSTER_FW_FILE" ]; then
     # Se [OPTIONS] já existe, tenta inserir as localnets dentro dele
@@ -456,16 +455,16 @@ if [ -f "$CLUSTER_FW_FILE" ]; then
         # Remove localnets antigas se existirem
         log_cmd "sed -i '/^localnet:/d' $CLUSTER_FW_FILE"
         # Insere as novas localnets após a linha [OPTIONS]
-        log_cmd "sed -i '/^\\[OPTIONS\\]/a\\localnet: 172.20.220.0/24,172.21.221.0/24,172.25.125.0/24' $CLUSTER_FW_FILE"
+        log_cmd "sed -i '/^\\[OPTIONS\\]/a\\localnet: $LOCAL_NETWORKS_LIST' $CLUSTER_FW_FILE"
     else
         # Se [OPTIONS] não existe, adiciona o bloco completo
         log_info "Seção [OPTIONS] não encontrada em $CLUSTER_FW_FILE. Adicionando bloco OPTIONS com localnets..."
         # Adiciona o bloco [OPTIONS] e localnets ao final do arquivo
-        log_cmd "echo -e '\n[OPTIONS]\nlocalnet: 172.20.220.0/24,172.21.221.0/24,172.25.125.0/24' >> $CLUSTER_FW_FILE"
+        log_cmd "echo -e '\n[OPTIONS]\nlocalnet: $LOCAL_NETWORKS_LIST' >> $CLUSTER_FW_FILE"
     fi
 else
     log_info "Arquivo $CLUSTER_FW_FILE não encontrado. Criando e adicionando localnets..."
-    log_cmd "echo -e '[OPTIONS]\nlocalnet: 172.20.220.0/24,172.21.221.0/24,172.25.125.0/24' > $CLUSTER_FW_FILE"
+    log_cmd "echo -e '[OPTIONS]\nlocalnet: $LOCAL_NETWORKS_LIST' > $CLUSTER_FW_FILE"
 fi
 log_ok "✅ Configuração de 'localnet' no firewall do cluster concluída."
 
