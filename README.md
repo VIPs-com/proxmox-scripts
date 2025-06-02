@@ -157,7 +157,8 @@ Execute este script diretamente no terminal de **cada nó Proxmox** para validar
 
 ### 1. Execução rápida via `curl`:
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh)
+bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh || echo "echo '❌ Falha ao baixar o script'; exit 1")
+
 ```
 
 ### 2. Ou baixe e execute manualmente:
