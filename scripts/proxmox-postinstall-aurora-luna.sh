@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (v.12 - Correção Separador Localnet)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.17 - Correção Separador Localnet)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
