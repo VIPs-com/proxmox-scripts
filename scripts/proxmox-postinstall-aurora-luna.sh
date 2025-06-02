@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.10/10 - Foco no Essencial e Usabilidade)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.2 - Foco no Essencial e Usabilidade)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -363,7 +363,7 @@ log_info "✅ Verificação de portas concluída."
 
 log_info "🛡️ Configurando o firewall do Proxmox VE com regras específicas..."
 log_cmd "pve-firewall stop"         # Parar o firewall para aplicar novas regras
-log_cmd "pve-firewall rules --clean" # Limpa todas as regras existentes
+# A linha 'pve-firewall rules --clean' foi removida aqui, pois 'pve-firewall stop' já limpa as regras geradas.
 
 # Regras para permitir acesso ao WebUI (porta 8006) e SSH (porta 22) apenas das redes locais
 log_info "Permitindo acesso ao WebUI (8006) e SSH (22) apenas das redes locais..."
