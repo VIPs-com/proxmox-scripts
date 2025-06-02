@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script de verificação de rede para Proxmox VE - Versão 1.8
+# Script de verificação de rede para Proxmox VE - Versão 1.9
 
 echo "ℹ️  Verificação de rede iniciada em $(date '+%Y-%m-%d %H:%M:%S')"
 
@@ -10,7 +10,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # 2. Configuração dinâmica de IPs
-CLUSTER_IPS="172.20.220.21 172.20.220.22"
+CLUSTER_IPS="172.20.220.20 172.20.220.21"
 EXTERNAL_SERVERS="google.com cloudflare.com github.com"
 
 # 3. Atualizar lista de pacotes e instalar dependências essenciais
@@ -27,7 +27,7 @@ for pkg in $DEPENDENCIAS; do
   fi
 done
 
-echo "==========================="
+
 echo "📡 Teste de conectividade"
 echo "==========================="
 
@@ -50,7 +50,7 @@ else
   logger "Falha na resolução de DNS"
 fi
 
-echo "==========================="
+
 echo "🌐 Teste de Rede Local"
 echo "==========================="
 
@@ -82,7 +82,7 @@ for ip in $CLUSTER_IPS; do
     logger "Falha na comunicação com o nó $ip"
 done
 
-echo "==========================="
+
 echo "🔄 Testes Adicionais"
 echo "==========================="
 
@@ -104,9 +104,9 @@ done
 echo -e "\n📊 Testando perda de pacotes..."
 ping -c 10 8.8.8.8 | grep 'packet loss'
 
-echo "==========================="
+
 echo "📝 Resumo Final"
-echo "==========================="
+
 echo "ℹ️  Diagnóstico concluído!"
 echo "==========================="
 
