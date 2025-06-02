@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.0 - Foco no Essencial e Usabilidade)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.11 - Foco no Essencial e Usabilidade)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -242,7 +242,7 @@ log_info "🔍 Validando formato dos IPs e máscara de rede..."
 # Validar cada IP do cluster
 for ip in "${CLUSTER_PEER_IPS[@]}"; do
     validate_ip "$ip"
-F
+done
 log_info "✅ Formato dos IPs em CLUSTER_PEER_IPS verificado."
 
 # Validar formato da rede (ex: 172.20.220.0/24)
@@ -342,8 +342,8 @@ log_cmd "echo 'deb http://security.debian.org/debian-security bookworm-security 
 # Adiciona o repositório Proxmox VE "no-subscription"
 log_cmd "echo 'deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription' > /etc/apt/sources.list.d/pve-no-subscription.list"
 
-log_info "🔄 Atualizando listas de pacotes e o sistema operacional...
-"log_cmd "apt update"
+log_info "🔄 Atualizando listas de pacotes e o sistema operacional..."
+log_cmd "apt update"
 log_cmd "apt dist-upgrade -y"   # Atualiza todos os pacotes e resolve dependências
 log_cmd "apt autoremove -y"     # Remove pacotes órfãos
 log_cmd "apt clean"             # Limpa o cache de pacotes
@@ -353,8 +353,8 @@ log_info "🧹 Removendo o aviso de assinatura Proxmox VE do WebUI (se não poss
 log_cmd "echo \"DPkg::Post-Invoke { \\\"dpkg -V proxmox-widget-toolkit | grep -q '/proxmoxlib.js$'; if [ \\\$? -eq 1 ]; then sed -i '/.*data.status.*{/{s/\\!//;s/active/NoMoreNagging/}' /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js; fi\\\"; };\" > /etc/apt/apt.conf.d/no-nag-script"
 # Reinstala o pacote para aplicar a modificação imediatamente (ou após futuras atualizações do pacote)
 log_cmd "apt --reinstall install -y proxmox-widget-toolkit"
-log_info "✅ Aviso de assinatura removido do WebUI (se aplicável).
-"
+log_info "✅ Aviso de assinatura removido do WebUI (se aplicável)."
+
 # --- Fase 4: Configuração de Firewall ---
 
 log_info "🔍 Verificando portas críticas em uso antes de configurar o firewall..."
@@ -371,6 +371,9 @@ log_info "🛡️ Configurando o firewall do Proxmox VE com regras específicas.
 
 # Adicionado: Tentativa de resetar o firewall para um estado limpo
 log_info "Desativando e limpando todas as regras existentes do firewall Proxmox VE..."
+# Reinstala o pacote pve-firewall para garantir que esteja em um estado limpo
+log_cmd "apt --reinstall install -y pve-firewall"
+
 # Verifica se o firewall está habilitado e desabilita
 if pve-firewall status | grep -q "Status: enabled"; then
     log_info "O firewall Proxmox VE está habilitado. Desativando-o temporariamente."
