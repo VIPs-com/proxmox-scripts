@@ -24,7 +24,7 @@ echo -e "\n✅ Verificação concluída com sucesso!"
 
 # Adicione no final do script
 echo -e "\n📡 Testando comunicação com outros nós..."
-for ip in 172.20.220.21 172.20.220.22; do
+for ip in 172.20.220.20 172.20.220.21; do
   ping -c 2 $ip >/dev/null && 
     echo "✅ Nó $ip acessível" || echo "❌ Nó $ip inacessível"
 done
