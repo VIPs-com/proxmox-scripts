@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script de verificação de rede para Proxmox VE - Versão 1.3
+# Script de verificação de rede para Proxmox VE - Versão 1.4
 
 echo "ℹ️  Verificação de rede iniciada em $(date '+%Y-%m-%d %H:%M:%S')"
 
@@ -48,33 +48,33 @@ for ip in 172.20.220.21 172.20.220.22; do
     echo "❌ Nó $ip inacessível"
 done
 
-# 7. Teste de velocidade da rede
+# 7. Corrigindo teste de velocidade da rede
 echo -e "\n🚀 Testando velocidade da rede..."
-curl -s https://speed.hetzner.de/100MB.bin -o /dev/null --write-out "✅ Download concluído - Velocidade: %{speed_download} bytes/s\n"
+SPEED_TEST=$(curl -s https://speed.hetzner.de/10MB.bin -o /dev/null --write-out "%{speed_download} bytes/s\n")
+if [[ "$SPEED_TEST" == "0 bytes/s" ]]; then
+  echo "❌ Teste de velocidade falhou ou bloqueado"
+else
+  echo "✅ Velocidade de download: $SPEED_TEST"
+fi
 
-# 8. Verificação de conectividade externa
+# 8. Teste de conectividade com servidores externos
 SERVERS="google.com cloudflare.com github.com"
 echo -e "\n🌍 Testando conectividade com servidores externos..."
 for server in $SERVERS; do
   ping -c 2 $server &>/dev/null && echo "✅ Conectado a $server" || echo "❌ Não foi possível alcançar $server"
 done
 
-# 9. Verificação de firewall
-echo -e "\n🛡️  Verificando regras de firewall..."
-sudo ufw status
-sudo iptables -L -n | grep DROP
-
-# 10. Teste de conectividade SSH entre nós
+# 9. Teste de conectividade SSH entre nós
 echo -e "\n🔄 Testando conectividade SSH entre nós..."
-for ip in 172.20.220.20 172.20.220.21; do
+for ip in 172.20.220.21 172.20.220.22; do
   nc -zvw3 $ip 22 && echo "✅ SSH ativo em $ip" || echo "❌ SSH inacessível em $ip"
 done
 
-# 11. Teste de perda de pacotes
+# 10. Teste de perda de pacotes
 echo -e "\n📊 Testando perda de pacotes..."
 ping -c 10 8.8.8.8 | grep 'packet loss'
 
-# 12. Exibir resumo final
+# 11. Exibir resumo final
 echo -e "\n📝 Resumo Final:"
 echo "--------------------------------"
 echo "ℹ️  Diagnóstico concluído!"
