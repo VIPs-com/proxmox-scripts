@@ -1,12 +1,8 @@
-# 🔍 Script de Verificação de Rede - Proxmox VE
-
-**Arquivo:** `utils/verifica-rede.sh`  
-**Propósito:** Diagnosticar e validar a conectividade entre nós de um cluster **antes** da execução do script de pós-instalação (`post-install.sh`).
-
----
 #!/bin/bash
+# Script para verificação de rede
 
-#!/bin/bash
+echo "ℹ️  Iniciando verificação de rede..."
+ping -c 4 8.8.8.8 | grep 'packet loss'
 
 # Verifica e instala curl se necessário
 if ! command -v curl &> /dev/null; then
@@ -17,6 +13,11 @@ if ! command -v curl &> /dev/null; then
         exit 1
     }
 fi
+---
+# 🔍 Script de Verificação de Rede - Proxmox VE
+**Arquivo:** `utils/verifica-rede.sh`  
+**Propósito:** Diagnosticar e validar a conectividade entre nós de um cluster **antes** da execução do script de pós-instalação (`post-install.sh`).
+
 ---
 
 ## 📌 Funcionalidades
@@ -91,19 +92,6 @@ Este script depende dos seguintes comandos:
 - `bash` (v4 ou superior)
 
 Se algum deles estiver ausente, o script irá avisar e interromper a execução.
-
----
-
-## 📁 Localização sugerida no Repositório
-
-Este arquivo e o script devem estar em:
-```
-proxmox-scripts/
-├
-└── utils/
-    ├── verifica-rede.sh
-   
-```
 
 ---
 
