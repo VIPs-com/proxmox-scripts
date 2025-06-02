@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.13 - Foco no Essencial e Usabilidade)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.14 - Foco no Essencial e Usabilidade)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -397,9 +397,9 @@ else
 fi
 
 # Garante que todas as regras sejam removidas (flush)
-log_info "Tentando limpar todas as regras do firewall Proxmox VE (flush)..."
-if ! log_cmd "pve-firewall flush"; then
-    log_erro "Falha ao executar 'pve-firewall flush'. Tentando limpar as regras diretamente via iptables/nftables como fallback."
+log_info "Tentando limpar todas as regras do firewall Proxmox VE (rules --clean)..."
+if ! log_cmd "pve-firewall rules --clean"; then
+    log_erro "Falha ao executar 'pve-firewall rules --clean'. Tentando limpar as regras diretamente via iptables/nftables como fallback."
     # Fallback: tentar limpar iptables/nftables diretamente
     # CUIDADO: Isso pode bloquear o acesso SSH se não for feito corretamente.
     # Vamos tentar limpar as chains INPUT, FORWARD, OUTPUT e as tabelas nat, mangle, raw.
