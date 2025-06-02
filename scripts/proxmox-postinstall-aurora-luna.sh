@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.14 - Foco no Essencial e Usabilidade)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (v.11 - Ajuste Final Firewall - Restart)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -396,84 +396,89 @@ else
     log_info "O firewall Proxmox VE já está desabilitado ou não está rodando."
 fi
 
-# Garante que todas as regras sejam removidas (flush)
-log_info "Tentando limpar todas as regras do firewall Proxmox VE (rules --clean)..."
-if ! log_cmd "pve-firewall rules --clean"; then
-    log_erro "Falha ao executar 'pve-firewall rules --clean'. Tentando limpar as regras diretamente via iptables/nftables como fallback."
-    # Fallback: tentar limpar iptables/nftables diretamente
-    # CUIDADO: Isso pode bloquear o acesso SSH se não for feito corretamente.
-    # Vamos tentar limpar as chains INPUT, FORWARD, OUTPUT e as tabelas nat, mangle, raw.
-    # Para Proxmox 8, nftables é o padrão, mas iptables-nft é a camada de compatibilidade.
-    # Vamos tentar limpar as regras mais comuns.
-    log_info "Executando iptables -F, iptables -X, iptables -P ACCEPT para todas as chains como fallback..."
-    log_cmd "iptables -F" # Flush all rules in filter table
-    log_cmd "iptables -X" # Delete all non-default chains in filter table
-    log_cmd "iptables -P INPUT ACCEPT" # Set default policy to ACCEPT
-    log_cmd "iptables -P FORWARD ACCEPT"
-    log_cmd "iptables -P OUTPUT ACCEPT"
+# --- Início da nova lógica de configuração do firewall via host.fw ---
+FIREWALL_DIR="/etc/pve/nodes/$NODE_NAME/firewall"
+HOST_FW_FILE="$FIREWALL_DIR/host.fw"
 
-    log_cmd "iptables -t nat -F" # Flush all rules in nat table
-    log_cmd "iptables -t nat -X" # Delete all non-default chains in nat table
+log_info "Criando diretório para arquivos de configuração do firewall do host: $FIREWALL_DIR..."
+log_cmd "mkdir -p $FIREWALL_DIR"
 
-    log_cmd "iptables -t mangle -F" # Flush all rules in mangle table
-    log_cmd "iptables -t mangle -X" # Delete all non-default chains in mangle table
+log_info "Fazendo backup do arquivo de configuração do firewall do host: $HOST_FW_FILE..."
+backup_file "$HOST_FW_FILE"
 
-    log_cmd "iptables -t raw -F" # Flush all rules in raw table
-    log_cmd "iptables -t raw -X" # Delete all non-default chains in raw table
+log_info "Escrevendo novas regras de firewall para $HOST_FW_FILE..."
+# Inicia o arquivo com as opções padrão e política de DROP para entrada
+cat <<EOF > "$HOST_FW_FILE"
+# firewall for host $NODE_NAME
+#
+[OPTIONS]
+enable: 1
+policy_in: DROP
+policy_out: ACCEPT
 
-    # For IPv6
-    log_info "Executando ip6tables -F, ip6tables -X, ip6tables -P ACCEPT para IPv6 como fallback..."
-    log_cmd "ip6tables -F"
-    log_cmd "ip6tables -X"
-    log_cmd "ip6tables -P INPUT ACCEPT"
-    log_cmd "ip6tables -P FORWARD ACCEPT"
-    log_cmd "ip6tables -P OUTPUT ACCEPT"
+[RULES]
+# Regras para permitir acesso ao WebUI (porta 8006) e SSH (porta 22) das redes locais
+IN ACCEPT -p tcp -s 172.20.220.0/24 --dport 8006 -j ACCEPT -c "Acesso WebUI Home Lab"
+IN ACCEPT -p tcp -s 172.21.221.0/24 --dport 8006 -j ACCEPT -c "Acesso WebUI Rede Interna"
+IN ACCEPT -p tcp -s 172.25.125.0/24 --dport 8006 -j ACCEPT -c "Acesso WebUI Wi-Fi Arkadia"
+IN ACCEPT -p tcp -s 172.20.220.0/24 --dport 22 -j ACCEPT -c "Acesso SSH Home Lab"
+IN ACCEPT -p tcp -s 172.21.221.0/24 --dport 22 -j ACCEPT -c "Acesso SSH Rede Interna"
+IN ACCEPT -p tcp -s 172.25.125.0/24 --dport 22 -j ACCEPT -c "Acesso SSH Wi-Fi Arkadia"
 
-    log_info "Reiniciando pve-firewall service após limpeza manual de iptables/nftables."
-    log_cmd "systemctl restart pve-firewall"
-    sleep 2 # Give it a moment to restart
-    log_ok "✅ Regras de firewall limpas via iptables/nftables fallback."
-fi
-
-log_ok "✅ Firewall Proxmox VE desativado e regras limpas com sucesso."
-
-
-# Regras para permitir acesso ao WebUI (porta 8006) e SSH (porta 22) apenas das redes locais
-log_info "Permitindo acesso ao WebUI (8006) e SSH (22) apenas das redes locais..."
-log_cmd "pve-firewall rule --add 172.20.220.0/24 --proto tcp --dport 8006 --accept --comment 'Acesso WebUI Home Lab'"
-log_cmd "pve-firewall rule --add 172.21.221.0/24 --proto tcp --dport 8006 --accept --comment 'Acesso WebUI Rede Interna'"
-log_cmd "pve-firewall rule --add 172.25.125.0/24 --proto tcp --dport 8006 --accept --comment 'Acesso WebUI Wi-Fi Arkadia'"
-log_cmd "pve-firewall rule --add 172.20.220.0/24 --proto tcp --dport 22 --accept --comment 'Acesso SSH Home Lab'"
-log_cmd "pve-firewall rule --add 172.21.221.0/24 --proto tcp --dport 22 --accept --comment 'Acesso SSH Rede Interna'"
-log_cmd "pve-firewall rule --add 172.25.125.0/24 --proto tcp --dport 22 --accept --comment 'Acesso SSH Wi-Fi Arkadia'"
-
-# Definindo redes locais para serem consideradas seguras pelo firewall (útil para VMs com 'firewall=1')
-log_info "Configurando 'localnet' para as VLANs internas..."
-log_cmd "pve-firewall localnet --add 172.20.220.0/24 --comment 'Home Lab VLAN (comunicação cluster)'"
-log_cmd "pve-firewall localnet --add 172.21.221.0/24 --comment 'Rede Interna Gerenciamento'"
-log_cmd "pve-firewall localnet --add 172.25.125.0/24 --comment 'Wi-Fi Arkadia'"
-
-# CRÍTICO**: Regras para comunicação INTERNA DO CLUSTER (Corosync e pve-cluster)
-# Essas regras são ABSOLUTAMENTE ESSENCIAIS para que os nós do cluster se comuniquem e funcionem corretamente.
-log_info "Permitindo tráfego essencial para comunicação do cluster (Corosync, pve-cluster) na rede **$CLUSTER_NETWORK**..."
-log_cmd "pve-firewall rule --add $CLUSTER_NETWORK --proto udp --dport 5404:5405 --accept --comment 'Corosync entre nós do cluster'"
-log_cmd "pve-firewall rule --add $CLUSTER_NETWORK --proto tcp --dport 2224 --accept --comment 'pve-cluster entre nós do cluster'"
+# CRÍTICO: Regras para comunicação INTERNA DO CLUSTER (Corosync e pve-cluster)
+IN ACCEPT -p udp -s $CLUSTER_NETWORK --dport 5404:5405 -j ACCEPT -c "Corosync entre nós do cluster"
+IN ACCEPT -p tcp -s $CLUSTER_NETWORK --dport 2224 -j ACCEPT -c "pve-cluster entre nós do cluster"
 
 # Permitir tráfego ICMP (ping) entre os nós do cluster para facilitar diagnósticos
-log_info "Permitindo tráfego ICMP (ping) na rede do cluster para facilitar diagnósticos futuros..."
-log_cmd "pve-firewall rule --add $CLUSTER_NETWORK --proto icmp --accept --comment 'Permitir ping entre os nós do cluster'"
+IN ACCEPT -p icmp -s $CLUSTER_NETWORK -j ACCEPT -c "Permitir ping entre os nós do cluster"
 
 # Regra para permitir tráfego de SAÍDA para NTP (servidores externos)
-log_info "Permitindo tráfego de saída para servidores NTP (porta UDP 123)..."
-log_cmd "pve-firewall rule --action ACCEPT --direction OUT --proto udp --dport 123 --comment 'Permitir saída para NTP'"
+OUT ACCEPT -p udp --dport 123 -j ACCEPT -c "Permitir saída para NTP"
 
-# Regra final: Bloquear todo o tráfego não explicitamente permitido (default deny)
-log_info "Aplicando regra de bloqueio padrão para todo o tráfego não autorizado..."
-log_cmd "pve-firewall rule --add 0.0.0.0/0 --drop --comment 'Bloquear tráfego não autorizado por padrão'"
+# A política padrão de entrada (policy_in: DROP) já bloqueia o tráfego não explicitamente permitido.
+# A política padrão de saída (policy_out: ACCEPT) permite a saída por padrão.
+EOF
+log_ok "✅ Regras de firewall escritas em $HOST_FW_FILE."
 
-log_info "Ativando e iniciando o serviço de firewall do Proxmox VE..."
-log_cmd "pve-firewall enable"
-log_cmd "pve-firewall start"
+# NOVO: Configurando 'localnet' diretamente no cluster.fw
+log_info "Configurando 'localnet' para as VLANs internas no firewall do cluster (cluster.fw)..."
+CLUSTER_FW_FILE="/etc/pve/firewall/cluster.fw"
+backup_file "$CLUSTER_FW_FILE"
+
+# Verifica se o arquivo cluster.fw existe, se não, cria-o.
+# Se já existir e contiver uma seção [OPTIONS], insere as localnets nela.
+# Caso contrário, sobrescreve o arquivo com um novo [OPTIONS] e as localnets.
+
+if [ -f "$CLUSTER_FW_FILE" ]; then
+    # Se [OPTIONS] já existe, tenta inserir as localnets dentro dele
+    if grep -q "^\[OPTIONS\]" "$CLUSTER_FW_FILE"; then
+        log_info "Seção [OPTIONS] encontrada em $CLUSTER_FW_FILE. Inserindo localnets..."
+        # Remove localnets antigas se existirem
+        log_cmd "sed -i '/^localnet:/d' $CLUSTER_FW_FILE"
+        # Insere as novas localnets após a linha [OPTIONS]
+        log_cmd "sed -i '/^\\[OPTIONS\\]/a\\localnet: 172.20.220.0/24,172.21.221.0/24,172.25.125.0/24' $CLUSTER_FW_FILE"
+    else
+        # Se [OPTIONS] não existe, adiciona o bloco completo
+        log_info "Seção [OPTIONS] não encontrada em $CLUSTER_FW_FILE. Adicionando bloco OPTIONS com localnets..."
+        # Adiciona o bloco [OPTIONS] e localnets ao final do arquivo
+        log_cmd "echo -e '\n[OPTIONS]\nlocalnet: 172.20.220.0/24,172.21.221.0/24,172.25.125.0/24' >> $CLUSTER_FW_FILE"
+    fi
+else
+    log_info "Arquivo $CLUSTER_FW_FILE não encontrado. Criando e adicionando localnets..."
+    log_cmd "echo -e '[OPTIONS]\nlocalnet: 172.20.220.0/24,172.21.221.0/24,172.25.125.0/24' > $CLUSTER_FW_FILE"
+fi
+log_ok "✅ Configuração de 'localnet' no firewall do cluster concluída."
+
+
+log_info "Ativando e recarregando o serviço de firewall do Proxmox VE para aplicar as novas regras..."
+# Tenta reiniciar o firewall diretamente, que é mais robusto para aplicar novas configurações
+if ! log_cmd "pve-firewall restart"; then
+    log_erro "Falha ao reiniciar o firewall Proxmox VE. Tentando recarregar as regras como fallback."
+    log_cmd "pve-firewall reload" # Fallback para reload se restart falhar
+fi
+log_ok "✅ Firewall Proxmox VE configurado e recarregado com sucesso."
+
+# --- Fim da nova lógica de configuração do firewall ---
 
 # --- Fase 5: Hardening de Segurança (Opcional) ---
 
@@ -590,14 +595,15 @@ log_info "    - Acesso SSH (porta 22) das redes internas"
 log_info "    - Comunicação interna do cluster (Corosync: 5404-5405, pve-cluster: 2224) na rede '$CLUSTER_NETWORK'"
 log_info "    - Ping (ICMP) entre os nós do cluster"
 log_info "    - Acesso de saída para NTP e Internet (HTTPS)"
+log_info "    - Redes Locais ('localnet') configuradas para: 172.20.220.0/24, 172.21.221.0/24, 172.25.125.0/24"
 log_info "✔️ Hardening SSH (desativa login root por senha): $(grep -q "PermitRootLogin prohibit-password" /etc/ssh/sshd_config && echo "Aplicado" || echo "Não aplicado")"
 log_info "✔️ NTP sincronizado: $(timedatectl show --property=NTPSynchronized --value && echo "Sim" || echo "Não")" # Verifica se NTP está sincronizado
 log_info "✔️ Repositórios atualizados: No-Subscription Proxmox VE e Debian Bookworm"
 log_info "---------------------------------------------------------"
 log_info "🔍 **PRÓXIMOS PASSO CRUCIAIS (MANUAIS)**:"
 log_info "1.  **REINICIE O NÓ**: Algumas configurações (especialmente de rede e SSH) só terão efeito total após o reinício. **Isso é fundamental!**"
-log_info "2.  **CRIE O CLUSTER (Primeiro Nó)**: No WebUI do seu primeiro nó, vá em **Datacenter > Cluster > Create Cluster**. Defina um nome para o cluster (ex: Aurora-Luna-Cluster)."
-log_info "3.  **ADICIONE OUTROS NÓS AO CLUSTER**: Nos demais nós, no WebUI, vá em **Datacenter > Cluster > Join Cluster**. Use as informações do primeiro nó (token) para adicioná-los."
+log_info "2.  **CRIE O CLUSTER (Primeiro Nó)**: No WebUI do seu primeiro nó, vá em **Datacenter > Cluster > Create Cluster**. Defina um nome para o cluster (ex: Aurora-Luna-Cluster)."\
+"3.  **ADICIONE OUTROS NÓS AO CLUSTER**: Nos demais nós, no WebUI, vá em **Datacenter > Cluster > Join Cluster**. Use as informações do primeiro nó (token) para adicioná-los."
 log_info "4.  **CONFIGURE STORAGES**: Após o cluster estar funcional, configure seus storages (LVM-Thin, ZFS, NFS, Ceph, etc.) conforme sua necessidade para armazenar VMs/CTs e ISOs."
 log_info "5.  **CRIE CHAVES SSH (se aplicou hardening)**: Se você aplicou o hardening SSH, configure suas chaves SSH para acesso root antes de fechar a sessão atual, para garantir acesso futuro."
 log_info "---------------------------------------------------------"
