@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.4 - Foco no Essencial e Usabilidade)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.5 - Foco no Essencial e Usabilidade)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -203,7 +203,7 @@ touch "$LOCK_FILE" # Cria o arquivo de lock
 
 log_info "📅 **INÍCIO**: Execução do script de pós-instalação no nó **$NODE_NAME** em $(date)"
 
-# Fase 1: Verificações Iniciais e Validação de Entrada
+# --- Fase 1: Verificações Iniciais e Validação de Entrada ---
 
 log_info "🔍 Verificando dependências essenciais do sistema (curl, ping, nc)..."
 check_dependency() {
@@ -267,9 +267,7 @@ else
 fi
 # Adicione mais checks aqui (CPU, disco, etc.) se desejar
 
----
-
-# Fase 2: Configuração de Tempo e NTP
+# --- Fase 2: Configuração de Tempo e NTP ---
 
 log_info "⏰ Configurando fuso horário para **$TIMEZONE** e sincronização NTP..."
 
@@ -299,8 +297,7 @@ if [ $? -ne 0 ]; then
 else
 log\_info "✅ Sincronização NTP bem\-sucedida\."
 fi
-\-\-\-
-\# \*\*Fase 3\: Gerenciamento de Repositórios e Atualizações
+\# \-\-\- Fase 3\: Gerenciamento de Repositórios e Atualizações \-\-\-
 log\_info "🗑️ Desabilitando repositório de subscrição e habilitando repositório PVE no\-subscription\.\.\."
 \# Faça backup de arquivos de lista de apt antes de modificar
 backup\_file "/etc/apt/sources\.list\.d/pve\-enterprise\.list"
@@ -329,11 +326,9 @@ log\_info "🧹 Removendo o aviso de assinatura Proxmox VE do WebUI \(se não po
 log\_cmd "echo \\"DPkg\:\:Post\-Invoke \{ \\\\\\"dpkg \-V proxmox\-widget\-toolkit \| grep \-q '/proxmoxlib\.js</span>'; if [ \\\$? -eq 1 ]; then sed -i '/.*data.status.*{/{s/\\!//;s/active/NoMoreNagging/}' /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js; fi\\\"; };\" > /etc/apt/apt.conf.d/no-nag-script"
 # Reinstala o pacote para aplicar a modificação imediatamente (ou após futuras atualizações do pacote)
 log_cmd "apt --reinstall install -y proxmox-widget-toolkit"
-log_info "✅ Aviso de assinatura removido do WebUI (se aplicável)."
+log_info "✅ Aviso de assinatura removido do WebUI (se aplicável).."
 
----
-
-# Fase 4: Configuração de Firewall
+# --- Fase 4: Configuração de Firewall ---
 
 log_info "🔍 Verificando portas críticas em uso antes de configurar o firewall..."
 # Lista de portas essenciais para Proxmox e cluster
@@ -366,74 +361,4 @@ log_cmd "pve-firewall localnet --add 172.25.125.0/24 --comment 'Wi-Fi Arkadia'"
 # CRÍTICO**: Regras para comunicação INTERNA DO CLUSTER (Corosync e pve-cluster)
 # Essas regras são ABSOLUTAMENTE ESSENCIAIS para que os nós do cluster se comuniquem e funcionem corretamente.
 log_info "Permitindo tráfego essencial para comunicação do cluster (Corosync, pve-cluster) na rede **$CLUSTER_NETWORK**..."
-log_cmd "pve-firewall rule --add $CLUSTER_NETWORK --proto udp --dport 5404:5405 --accept --comment 'Corosync entre nós do cluster'"
-log_cmd "pve-firewall rule --add $CLUSTER_NETWORK --proto tcp --dport 2224 --accept --comment 'pve-cluster entre nós do cluster'"
-
-# Permitir tráfego ICMP (ping) entre os nós do cluster para facilitar diagnósticos
-log_info "Permitindo tráfego ICMP (ping) na rede do cluster para facilitar diagnósticos futuros..."
-log_cmd "pve-firewall rule --add <span class="math-inline">CLUSTER\_NETWORK \-\-proto icmp \-\-accept \-\-comment 'Permitir ping entre os nós do cluster'"
-\# Regra para permitir tráfego de SAÍDA para NTP \(servidores externos\)
-log\_info "Permitindo tráfego de saída para servidores NTP \(porta UDP 123\)\.\.\."
-log\_cmd "pve\-firewall rule \-\-action ACCEPT \-\-direction OUT \-\-proto udp \-\-dport 123 \-\-comment 'Permitir saída para NTP'"
-\# Regra final\: Bloquear todo o tráfego não explicitamente permitido \(default deny\)
-log\_info "Aplicando regra de bloqueio padrão para todo o tráfego não autorizado\.\.\."
-log\_cmd "pve\-firewall rule \-\-add 0\.0\.0\.0/0 \-\-drop \-\-comment 'Bloquear tráfego não autorizado por padrão'"
-log\_info "Ativando e iniciando o serviço de firewall do Proxmox VE\.\.\."
-log\_cmd "pve\-firewall enable"
-log\_cmd "pve\-firewall start"
-\-\-\-
-\# Fase 5\: Hardening de Segurança \(Opcional\)
-read \-p "🔒 Deseja aplicar hardening de segurança \(desativar login de root por senha e password authentication\)? \[s/N\] " \-n 1 \-r \-t 10
-echo \# Nova linha após a resposta
-REPLY\=</span>{REPLY:-N}
-if [[ <span class="math-inline">REPLY \=\~ ^\[Ss\]</span> ]]; then
-    log_info "🔒 Aplicando hardening SSH..."
-    backup_file "/etc/ssh/sshd_config"
-    log_cmd "sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config"
-    log_cmd "sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config"
-    log_cmd "systemctl restart sshd"
-    log_info "✅ Hardening aplicado! **Atenção**: Agora, o acesso ao root via SSH só será possível usando chaves SSH. Certifique-se de tê-las configuradas antes de fechar a sessão atual."
-else
-    log_info "ℹ️ Hardening SSH ignorado. O login por senha permanece ativo (menos seguro para produção)."
-fi
-
----
-
-# Fase 6: Instalação de Pacotes Opcionais
-
-install_optional_tools() {
-    echo
-    read -p "📦 Deseja instalar ferramentas adicionais úteis (ex: qemu-guest-agent, ifupdown2, git, htop, smartmontools)? [s/N] " -n 1 -r -t 10
-    echo # Nova linha após a resposta
-    REPLY=${REPLY:-N}
-    if [[ <span class="math-inline">REPLY \=\~ ^\[Ss\]</span> ]]; then
-        log_info "Instalando pacotes adicionais..."
-        log_cmd "apt install -y qemu-guest-agent ifupdown2 git htop smartmontools"
-        log_info "✅ Pacotes adicionais instalados."
-    else
-        log_info "ℹ️ Instalação de pacotes adicionais ignorada."
-    fi
-}
-install_optional_tools
-
----
-
-# Fase 7: Verificações Pós-Configuração e Finalização
-
-log_info "🔍 Verificando status de serviços críticos do Proxmox VE..."
-if ! systemctl is-active corosync pve-cluster pvedaemon; then
-    log_erro "Um ou mais serviços críticos do Proxmox (corosync, pve-cluster, pvedaemon) NÃO estão ativos. Verifique os logs e tente reiniciar manualmente."
-    log_info "O script será encerrado devido à falha de serviço crítico."
-    exit 1
-else
-    log_ok "✅ Todos os serviços críticos do Proxmox VE (corosync, pve-cluster, pvedaemon) estão ativos."
-fi
-
-
-log_info "🔗 Realizando testes de conectividade essencial do cluster com nós pares..."
-for node_entry in "${CLUSTER_NODES_CONFIG[@]}"; do
-    read -r PEER_IP PEER_HOSTNAME <<< "$node_entry"
-
-    # Obtém o IP principal do próprio nó para evitar testar a si mesmo
-    # Adaptação para obter o IP da interface que está na CLUSTER_NETWORK (útil se houver múltiplas interfaces)
-    CURRENT_NODE_IP
+log_cmd "pve-firewall rule --add $CLUSTER
