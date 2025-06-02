@@ -164,7 +164,7 @@ Execute este script diretamente no terminal de **cada nó Proxmox** para validar
 
 ---
 
-### 1. Execução rápida via `curl`:
+### 1. Verificação de Rede (Execute em TODOS os nós)
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh || echo "echo '❌ Falha ao baixar o script'; exit 1")
 
@@ -203,6 +203,10 @@ chmod +x utils/verifica-rede.sh
 📊 Resultado Final:
 ✅ Todos os testes básicos passaram!
 ℹ️  Recomendação: Prossiga com a instalação
+
+```
+## Pós-Instalação
+bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/scripts/proxmox-postinstall-aurora-luna.sh)
 
 ```
 
