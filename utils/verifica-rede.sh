@@ -1,14 +1,23 @@
 #!/bin/bash
-# Script de verificação de rede para Proxmox Cluster
+# Script de verificação de rede para Proxmox VE
+# Versão: 1.0
+# Uso: bash <(curl -s URL_DO_SCRIPT)
 
-echo "✅ Verificação de rede iniciada em $(date)"
+echo "ℹ️  Verificação de rede iniciada em $(date '+%Y-%m-%d %H:%M:%S')"
 
-# Teste de ping básico
-echo -e "\n🔍 Testando conectividade básica:"
-ping -c 4 8.8.8.8 | grep 'packet loss'
+# 1. Teste de conectividade básica
+echo -e "\n🔍 Testando conectividade com gateway..."
+ping -c 4 $(ip route show default | awk '/default/ {print $3}') | grep 'packet loss'
 
-# Verifica IP local
-echo -e "\n🌐 IP local:"
-hostname -I
+# 2. Verificação de IP local
+echo -e "\n🌐 Endereços de rede locais:"
+ip -brief address show | grep -v 'lo'
 
-echo -e "\n✅ Verificação concluída!"
+# 3. Teste de portas essenciais
+echo -e "\n🔌 Verificando portas críticas..."
+for porta in 22 8006 5404 5405; do
+  timeout 1 bash -c "echo >/dev/tcp/localhost/$porta" 2>/dev/null &&
+    echo "✅ Porta $porta aberta" || echo "❌ Porta $porta fechada"
+done
+
+echo -e "\n✅ Verificação concluída com sucesso!"
