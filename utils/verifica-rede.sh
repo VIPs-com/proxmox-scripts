@@ -4,6 +4,19 @@
 **Propósito:** Diagnosticar e validar a conectividade entre nós de um cluster **antes** da execução do script de pós-instalação (`post-install.sh`).
 
 ---
+#!/bin/bash
+
+# Verifica/Instala curl (se não existir)
+if ! command -v curl &> /dev/null; then
+    echo "ℹ️  Instalando curl..."
+    apt-get update && apt-get install -y curl || {
+        echo "❌ Falha ao instalar curl"
+        exit 1
+    }
+fi
+
+# Restante do script...
+---
 
 ## 📌 Funcionalidades
 
