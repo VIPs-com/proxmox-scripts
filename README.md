@@ -38,7 +38,7 @@
 
 ```bash
 # Método com curl (recomendado):
-curl -sL https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/proxmox-postinstall-aurora-luna.sh | bash
+curl -sL https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/scripts/proxmox-postinstall-aurora-luna.sh | bash
 
 # Método com wget:
 wget https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/proxmox-postinstall-aurora-luna.sh
