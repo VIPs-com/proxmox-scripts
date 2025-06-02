@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.9 - Foco no Essencial e Usabilidade)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.0 - Foco no Essencial e Usabilidade)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -242,7 +242,7 @@ log_info "🔍 Validando formato dos IPs e máscara de rede..."
 # Validar cada IP do cluster
 for ip in "${CLUSTER_PEER_IPS[@]}"; do
     validate_ip "$ip"
-done
+F
 log_info "✅ Formato dos IPs em CLUSTER_PEER_IPS verificado."
 
 # Validar formato da rede (ex: 172.20.220.0/24)
@@ -342,8 +342,8 @@ log_cmd "echo 'deb http://security.debian.org/debian-security bookworm-security 
 # Adiciona o repositório Proxmox VE "no-subscription"
 log_cmd "echo 'deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription' > /etc/apt/sources.list.d/pve-no-subscription.list"
 
-log_info "🔄 Atualizando listas de pacotes e o sistema operacional..."
-log_cmd "apt update"
+log_info "🔄 Atualizando listas de pacotes e o sistema operacional...
+"log_cmd "apt update"
 log_cmd "apt dist-upgrade -y"   # Atualiza todos os pacotes e resolve dependências
 log_cmd "apt autoremove -y"     # Remove pacotes órfãos
 log_cmd "apt clean"             # Limpa o cache de pacotes
@@ -353,8 +353,8 @@ log_info "🧹 Removendo o aviso de assinatura Proxmox VE do WebUI (se não poss
 log_cmd "echo \"DPkg::Post-Invoke { \\\"dpkg -V proxmox-widget-toolkit | grep -q '/proxmoxlib.js$'; if [ \\\$? -eq 1 ]; then sed -i '/.*data.status.*{/{s/\\!//;s/active/NoMoreNagging/}' /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js; fi\\\"; };\" > /etc/apt/apt.conf.d/no-nag-script"
 # Reinstala o pacote para aplicar a modificação imediatamente (ou após futuras atualizações do pacote)
 log_cmd "apt --reinstall install -y proxmox-widget-toolkit"
-log_info "✅ Aviso de assinatura removido do WebUI (se aplicável)."
-
+log_info "✅ Aviso de assinatura removido do WebUI (se aplicável).
+"
 # --- Fase 4: Configuração de Firewall ---
 
 log_info "🔍 Verificando portas críticas em uso antes de configurar o firewall..."
@@ -368,8 +368,21 @@ done
 log_info "✅ Verificação de portas concluída."
 
 log_info "🛡️ Configurando o firewall do Proxmox VE com regras específicas..."
-# REMOVIDO: log_cmd "pve-firewall stop" # REMOVIDO DEFINITIVAMENTE!
-# REMOVIDO: log_cmd "pve-firewall rules --clean" # REMOVIDO DEFINITIVAMENTE!
+
+# Adicionado: Tentativa de resetar o firewall para um estado limpo
+log_info "Desativando e limpando todas as regras existentes do firewall Proxmox VE..."
+# Verifica se o firewall está habilitado e desabilita
+if pve-firewall status | grep -q "Status: enabled"; then
+    log_info "O firewall Proxmox VE está habilitado. Desativando-o temporariamente."
+    log_cmd "pve-firewall disable"
+else
+    log_info "O firewall Proxmox VE já está desabilitado ou não está rodando."
+fi
+
+# Garante que todas as regras sejam removidas (flush)
+log_cmd "pve-firewall flush"
+log_info "✅ Firewall Proxmox VE desativado e regras limpas com sucesso."
+
 
 # Regras para permitir acesso ao WebUI (porta 8006) e SSH (porta 22) apenas das redes locais
 log_info "Permitindo acesso ao WebUI (8006) e SSH (22) apenas das redes locais..."
@@ -527,9 +540,9 @@ log_info "✔️ Hardening SSH (desativa login root por senha): $(grep -q "Permi
 log_info "✔️ NTP sincronizado: $(timedatectl show --property=NTPSynchronized --value && echo "Sim" || echo "Não")" # Verifica se NTP está sincronizado
 log_info "✔️ Repositórios atualizados: No-Subscription Proxmox VE e Debian Bookworm"
 log_info "---------------------------------------------------------"
-log_info "🔍 **PRÓXIMOS PASSOS CRUCIAIS (MANUAIS)**:"
+log_info "🔍 **PRÓXIMOS PASSO CRUCIAIS (MANUAIS)**:"
 log_info "1.  **REINICIE O NÓ**: Algumas configurações (especialmente de rede e SSH) só terão efeito total após o reinício. **Isso é fundamental!**"
-log_info "2.  **CRIE O CLUSTER (Primeiro Nó)**: No WebUI do seu primeiro nó, vá em **Datacenter > Cluster > Create Cluster**. Defina um nome para o cluster (ex: Aurora-Luna-Cluster).`"
+log_info "2.  **CRIE O CLUSTER (Primeiro Nó)**: No WebUI do seu primeiro nó, vá em **Datacenter > Cluster > Create Cluster**. Defina um nome para o cluster (ex: Aurora-Luna-Cluster)."
 log_info "3.  **ADICIONE OUTROS NÓS AO CLUSTER**: Nos demais nós, no WebUI, vá em **Datacenter > Cluster > Join Cluster**. Use as informações do primeiro nó (token) para adicioná-los."
 log_info "4.  **CONFIGURE STORAGES**: Após o cluster estar funcional, configure seus storages (LVM-Thin, ZFS, NFS, Ceph, etc.) conforme sua necessidade para armazenar VMs/CTs e ISOs."
 log_info "5.  **CRIE CHAVES SSH (se aplicou hardening)**: Se você aplicou o hardening SSH, configure suas chaves SSH para acesso root antes de fechar a sessão atual, para garantir acesso futuro."
