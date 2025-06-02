@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V1.1.1 - Foco no Essencial e Usabilidade)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.10/10 - Foco no Essencial e Usabilidade)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -318,8 +318,15 @@ backup_file "/etc/apt/sources.list.d/pve-enterprise.list"
 backup_file "/etc/apt/sources.list"
 backup_file "/etc/apt/sources.list.d/pve-no-subscription.list"
 
-# Comenta a linha do pve-enterprise.list
-log_cmd "sed -i 's/^deb/#deb/' /etc/apt/sources.list.d/pve-enterprise.list"
+# CORREÇÃO: Verifica se o arquivo existe antes de tentar modificá-lo
+if [ -f "/etc/apt/sources.list.d/pve-enterprise.list" ]; then
+    log_info "Comentando a linha do pve-enterprise.list para desabilitar o repositório de subscrição."
+    log_cmd "sed -i 's/^deb/#deb/' /etc/apt/sources.list.d/pve-enterprise.list"
+else
+    log_info "ℹ️ Arquivo /etc/apt/sources.list.d/pve-enterprise.list não encontrado. Nenhuma ação necessária para desabilitar o repositório de subscrição."
+fi
+
+
 # Adiciona/sobrescreve os repositórios Debian padrão
 log_cmd "echo 'deb http://ftp.debian.org/debian bookworm main contrib' > /etc/apt/sources.list"
 log_cmd "echo 'deb http://ftp.debian.org/debian bookworm-updates main contrib' >> /etc/apt/sources.list"
