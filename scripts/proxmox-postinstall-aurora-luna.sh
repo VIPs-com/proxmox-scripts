@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.6 - Foco no Essencial e Usabilidade)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.7 - Foco no Essencial e Usabilidade)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -47,7 +47,7 @@ LOCK_FILE="/etc/proxmox-postinstall.lock" # Garante que o script não seja execu
 START_TIME=$(date +%s)            # Início do registro de tempo de execução
 
 # --- INSTRUÇÕES DE EXECUÇÃO ---
-#
+
 # 📌 Método Recomendado: Via WebUI (para cada nó):
 #    1. Acesse o Proxmox WebUI em cada host (ex: Aurora: https://172.20.220.20:8006, Luna: https://172.20.220.21:8006).
 #    2. Vá até a seção "**Shell**" de cada nó.
@@ -146,7 +146,7 @@ fi
 # --- INÍCIO DA EXECUÇÃO DO SCRIPT ---
 
 # 🔒 Prevenção de Múltiplas Execuções
-if [ "$SKIP_LOCK" = false ] && [ -f "$LOCK_FILE" ]; then
+if [[ "$SKIP_LOCK" == "false" && -f "$LOCK_FILE" ]]; then
     echo "⚠️ **ALERTA**: O script já foi executado anteriormente neste nó ($NODE_NAME). Abortando para evitar configurações duplicadas."
     echo "Se você realmente precisa re-executar, remova '$LOCK_FILE' ou use '--skip-lock' (NÃO RECOMENDADO)."
     exit 1
@@ -276,8 +276,6 @@ log_cmd "echo \"DPkg::Post-Invoke { \\\"dpkg -V proxmox-widget-toolkit | grep -q
 # Reinstala o pacote para aplicar a modificação imediatamente (ou após futuras atualizações do pacote)
 log_cmd "apt --reinstall install -y proxmox-widget-toolkit"
 log_info "✅ Aviso de assinatura removido do WebUI (se aplicável)."
-
-# Restante do script permanece o mesmo...
 
 # --- Fase 4: Configuração de Firewall ---
 
