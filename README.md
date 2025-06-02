@@ -9,6 +9,88 @@
 
 ---
 
+## 🚀 Como Usar
+
+Execute este script diretamente no terminal de **cada nó Proxmox** para validar sua configuração de rede:
+
+---
+
+## Pré-Requisitos Mínimos
+- Caso não tenha curl/wget, execute manualmente:
+  ```bash
+  apt-get update && apt-get install -y curl
+
+---
+
+### 1. Verificação de Rede (Execute em TODOS os nós)
+```bash
+bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh)
+
+```
+
+### 2. Ou baixe e execute manualmente:
+```bash
+mkdir -p utils
+wget -O utils/verifica-rede.sh https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh
+chmod +x utils/verifica-rede.sh
+./utils/verifica-rede.sh
+```
+
+---
+
+## 🖥️ Exemplo de Saída
+
+```bash
+ℹ️  Diagnóstico de Rede - Sat Jun 01 16:40:00 UTC 2025
+----------------------------------------
+ℹ️  1/3 - Medição de Latência:
+✅  172.20.220.20 → Latência média: 0.65ms
+✅  172.20.220.21 → Latência média: 0.58ms
+
+ℹ️  2/3 - Verificando portas essenciais:
+🔧 Nó 172.20.220.20:
+✅ Porta 22 → Acessível
+✅ Porta 8006 → Acessível
+✅ Porta 5404 → Acessível
+[...]
+
+ℹ️  3/3 - Verificando resolução DNS:
+✅  172.20.220.20 → node01.localdomain
+✅  172.20.220.21 → node02.localdomain
+
+📊 Resultado Final:
+✅ Todos os testes básicos passaram!
+ℹ️  Recomendação: Prossiga com a instalação
+
+---
+
+# 📦 proxmox-scripts
+
+Scripts úteis para automação e configuração de ambientes com **Proxmox VE**, com foco em clusters e boas práticas de rede.
+
+---
+
+## 🛠️ Ferramentas de Diagnóstico
+
+### 🔍 Script de Verificação de Rede
+
+**Arquivo:** `utils/verifica-rede.sh`
+
+Este script serve como uma ferramenta de **pré-verificação essencial** para o seu ambiente Proxmox VE. Ele deve ser executado **antes** do script principal de pós-instalação (`post-install.sh`) para garantir que sua rede e conectividade básica estejam funcionando corretamente.
+
+#### ✅ Funcionalidades:
+* 📶 **Teste de latência:** Mede a latência de ping entre os nós do seu cluster.
+* 🔌 **Verificação de portas essenciais:** Confere a acessibilidade de portas críticas como SSH (22), WebUI (8006), e as portas do Corosync (5404, 5405, 5406, 5407).
+* 🌐 **Checagem de DNS reverso:** Verifica se a resolução reversa de DNS está configurada corretamente para os IPs dos seus nós.
+
+---
+
+```
+## Pós-Instalação
+bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/scripts/proxmox-postinstall-aurora-luna.sh)
+```
+---
+
 ## 📌 Script de Pós-Instalação
 
 **`postinstall-aurora-luna.sh`** - Configura automaticamente os nós:
@@ -105,7 +187,6 @@ git push origin minha-feature
 ```bash
 nc -zv 172.20.220.20 5404
 ```
-
 ---
 
 ### 🔹 Erro: "Permissão negada ao rodar script"
@@ -115,7 +196,6 @@ nc -zv 172.20.220.20 5404
 ```bash
 chmod +x nome-do-script.sh
 ```
-
 ---
 
 ### 🔹 Erro: "Comando pveperf não encontrado"
@@ -127,88 +207,6 @@ chmod +x nome-do-script.sh
 **Contribuições e sugestões são sempre bem-vindas!**
 
 ---
-
-
-
-# 📦 proxmox-scripts
-
-Scripts úteis para automação e configuração de ambientes com **Proxmox VE**, com foco em clusters e boas práticas de rede.
-
----
-
-## 🛠️ Ferramentas de Diagnóstico
-
-### 🔍 Script de Verificação de Rede
-
-**Arquivo:** `utils/verifica-rede.sh`
-
-Este script serve como uma ferramenta de **pré-verificação essencial** para o seu ambiente Proxmox VE. Ele deve ser executado **antes** do script principal de pós-instalação (`post-install.sh`) para garantir que sua rede e conectividade básica estejam funcionando corretamente.
-
-#### ✅ Funcionalidades:
-* 📶 **Teste de latência:** Mede a latência de ping entre os nós do seu cluster.
-* 🔌 **Verificação de portas essenciais:** Confere a acessibilidade de portas críticas como SSH (22), WebUI (8006), e as portas do Corosync (5404, 5405, 5406, 5407).
-* 🌐 **Checagem de DNS reverso:** Verifica se a resolução reversa de DNS está configurada corretamente para os IPs dos seus nós.
-
----
-
-## 🚀 Como Usar
-
-Execute este script diretamente no terminal de **cada nó Proxmox** para validar sua configuração de rede:
-
----
-
-## Pré-Requisitos Mínimos
-- Caso não tenha curl/wget, execute manualmente:
-  ```bash
-  apt-get update && apt-get install -y curl
-
----
-
-### 1. Verificação de Rede (Execute em TODOS os nós)
-```bash
-bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh || echo "echo '❌ Falha ao baixar o script'; exit 1")
-
-```
-
-### 2. Ou baixe e execute manualmente:
-```bash
-mkdir -p utils
-wget -O utils/verifica-rede.sh https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh
-chmod +x utils/verifica-rede.sh
-./utils/verifica-rede.sh
-```
-
----
-
-## 🖥️ Exemplo de Saída
-
-```bash
-ℹ️  Diagnóstico de Rede - Sat Jun 01 16:40:00 UTC 2025
-----------------------------------------
-ℹ️  1/3 - Medição de Latência:
-✅  172.20.220.20 → Latência média: 0.65ms
-✅  172.20.220.21 → Latência média: 0.58ms
-
-ℹ️  2/3 - Verificando portas essenciais:
-🔧 Nó 172.20.220.20:
-✅ Porta 22 → Acessível
-✅ Porta 8006 → Acessível
-✅ Porta 5404 → Acessível
-[...]
-
-ℹ️  3/3 - Verificando resolução DNS:
-✅  172.20.220.20 → node01.localdomain
-✅  172.20.220.21 → node02.localdomain
-
-📊 Resultado Final:
-✅ Todos os testes básicos passaram!
-ℹ️  Recomendação: Prossiga com a instalação
-
-```
-## Pós-Instalação
-bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/scripts/proxmox-postinstall-aurora-luna.sh)
-
-```
 
 # Licença
 
