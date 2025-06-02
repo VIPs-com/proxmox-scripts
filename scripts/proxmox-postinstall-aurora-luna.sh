@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.7 - Foco no Essencial e Usabilidade)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.9 - Foco no Essencial e Usabilidade)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -64,6 +64,9 @@ START_TIME=$(date +%s)            # Início do registro de tempo de execução
 
 # Funções de Log
 log_info() { echo -e "\nℹ️ $*" | tee -a "$LOG_FILE"; }
+log_ok() { echo -e "\n✅ $*" | tee -a "$LOG_FILE"; } # Adicionado para mensagens de sucesso
+log_erro() { echo -e "\n❌ **ERRO**: $*" | tee -a "$LOG_FILE"; } # Adicionado para mensagens de erro (não críticas para abortar)
+
 log_cmd() {
     echo -e "\n🔹 Executando Comando: $*" | tee -a "$LOG_FILE"
     eval "$@" >> "$LOG_FILE" 2>&1
@@ -100,10 +103,54 @@ backup_file() {
 validate_ip() {
     local ip="$1"
     if ! [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        log_info "❌ **ERRO**: IP '$ip' inválido. Use formato 'XXX.XXX.XXX.XXX'."
+        log_erro "IP '$ip' inválido. Use formato 'XXX.XXX.XXX.XXX'."
         exit 1
     fi
 }
+
+# Nova função: Configura entradas em /etc/hosts para os nós do cluster
+configurar_hosts() {
+    log_info "📝 Configurando entradas em /etc/hosts para os nós do cluster..."
+    backup_file "/etc/hosts" # Faz backup do /etc/hosts antes de modificar
+
+    # Adaptação para usar CLUSTER_PEER_IPS para configurar /etc/hosts
+    # Assumimos que CLUSTER_PEER_IPS contém IPs e que o hostname do nó atual é o correto para seu IP.
+    # Para outros nós, é ideal ter uma lista de IP e Hostname, mas para simplificar,
+    # vamos adicionar apenas o IP do nó atual e os IPs dos pares.
+    # Para um setup mais robusto, CLUSTER_NODES_CONFIG=("IP HOSTNAME" ...) seria melhor.
+    
+    local current_ip=$(hostname -I | awk '{print $1}') # Pega o primeiro IP do nó atual
+    local current_hostname=$(hostname)
+
+    # Adiciona o próprio nó
+    if ! grep -qE "^$current_ip\s+$current_hostname(\s+|$)" /etc/hosts; then
+        if grep -qE "^$current_ip\s+" /etc/hosts; then
+            log_info "Removendo entrada existente para IP '$current_ip' em /etc/hosts antes de adicionar o hostname correto."
+            log_cmd "sed -i '/^$current_ip\s\+/d' /etc/hosts"
+        fi
+        log_info "Adicionando entrada: '$current_ip $current_hostname' a /etc/hosts."
+        log_cmd "echo \"$current_ip $current_hostname\" >> /etc/hosts"
+    else
+        log_info "Entrada '$current_ip $current_hostname' já existe em /etc/hosts. Pulando."
+    fi
+
+    # Adiciona os IPs dos pares (sem hostname, pois CLUSTER_PEER_IPS não os contém)
+    # Para um ambiente de cluster, é ALTAMENTE recomendado que todos os nós tenham os hostnames dos outros nós em /etc/hosts ou via DNS.
+    # Como CLUSTER_PEER_IPS só tem IPs, vamos adicionar apenas os IPs para garantir a resolução básica.
+    for peer_ip in "${CLUSTER_PEER_IPS[@]}"; do
+        if [ "$peer_ip" = "$current_ip" ]; then
+            continue # Não adiciona o próprio IP novamente
+        fi
+        if ! grep -qE "^$peer_ip\s+" /etc/hosts; then # Verifica se o IP já existe
+            log_info "Adicionando entrada para IP de peer: '$peer_ip' a /etc/hosts (sem hostname, pois não está disponível)."
+            log_cmd "echo \"$peer_ip\" >> /etc/hosts" # Adiciona apenas o IP
+        else
+            log_info "Entrada para IP de peer '$peer_ip' já existe em /etc/hosts. Pulando."
+        fi
+    done
+    log_ok "✅ Configuração de /etc/hosts concluída."
+}
+
 
 # Função para exibir ajuda
 show_help() {
@@ -129,26 +176,44 @@ for arg in "$@"; do
     case "$arg" in
         -h|--help) show_help ;;
         --skip-lock) SKIP_LOCK=true ;;
-        *) echo "❌ Opção inválida: $arg. Use -h ou --help para ver as opções." >&2; exit 1 ;;
+        *) log_erro "Opção inválida: $arg. Use -h ou --help para ver as opções."; exit 1 ;;
     esac
 done
 
-# Carrega configurações de arquivo externo (se existir)
-if [ -f "/etc/proxmox-postinstall.conf" ]; then
-    log_info "⚙️ Carregando configurações de /etc/proxmox-postinstall.conf..."
+# --- DOWNLOAD E CARREGAMENTO DE CONFIGURAÇÃO EXTERNA ---
+CONFIG_URL="https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/etc/proxmox-postinstall.conf"
+CONFIG_FILE="/etc/proxmox-postinstall.conf"
+
+# Se o arquivo de configuração local não existir, baixa do GitHub
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    log_info "⚙️ Arquivo de configuração não encontrado localmente. Tentando baixar do GitHub: $CONFIG_URL..."
+    # Usa curl diretamente e captura o status, sem log_cmd para não abortar o script em caso de falha no download
+    curl -s -o "$CONFIG_FILE" "$CONFIG_URL"
+    if [ $? -eq 0 ] && [ -f "$CONFIG_FILE" ]; then
+        log_ok "✅ Configuração baixada e salva em $CONFIG_FILE."
+    else
+        log_erro "Falha ao baixar configurações do GitHub! Verifique a URL ou conectividade. Continuando com configurações padrão do script."
+        # Remove qualquer arquivo parcialmente baixado para evitar carregar conteúdo incompleto
+        rm -f "$CONFIG_FILE"
+    fi
+fi
+
+# Carrega configurações do arquivo (local ou recém-baixado)
+if [[ -f "$CONFIG_FILE" ]]; then
+    log_info "⚙️ Carregando configurações de $CONFIG_FILE..."
     # Garante que as variáveis sejam carregadas para o shell atual
-    source "/etc/proxmox-postinstall.conf"
-    log_info "✅ Configurações carregadas."
+    source "$CONFIG_FILE"
+    log_ok "✅ Configurações carregadas com sucesso!"
 else
-    log_info "ℹ️ Arquivo de configuração /etc/proxmox-postinstall.conf não encontrado. Usando configurações padrão do script."
+    log_info "ℹ️ Arquivo de configuração $CONFIG_FILE não encontrado. Usando configurações padrão do script."
 fi
 
 # --- INÍCIO DA EXECUÇÃO DO SCRIPT ---
 
 # 🔒 Prevenção de Múltiplas Execuções
 if [[ "$SKIP_LOCK" == "false" && -f "$LOCK_FILE" ]]; then
-    echo "⚠️ **ALERTA**: O script já foi executado anteriormente neste nó ($NODE_NAME). Abortando para evitar configurações duplicadas."
-    echo "Se você realmente precisa re-executar, remova '$LOCK_FILE' ou use '--skip-lock' (NÃO RECOMENDADO)."
+    log_erro "O script já foi executado anteriormente neste nó ($NODE_NAME). Abortando para evitar configurações duplicadas."
+    log_info "Se você realmente precisa re-executar, remova '$LOCK_FILE' ou use '--skip-lock' (NÃO RECOMENDADO)."
     exit 1
 fi
 touch "$LOCK_FILE" # Cria o arquivo de lock
@@ -161,7 +226,7 @@ log_info "🔍 Verificando dependências essenciais do sistema (curl, ping, nc).
 check_dependency() {
     local cmd="$1"
     if ! command -v "$cmd" &>/dev/null; then
-        echo "❌ **ERRO CRÍTICO**: O comando '$cmd' não foi encontrado. Por favor, instale-o (ex: apt install -y $cmd) e re-execute o script." | tee -a "$LOG_FILE"
+        log_erro "O comando '$cmd' não foi encontrado. Por favor, instale-o (ex: apt install -y $cmd) e re-execute o script."
         exit 1
     fi
     log_info "✅ Dependência '$cmd' verificada."
@@ -169,6 +234,9 @@ check_dependency() {
 check_dependency "curl"
 check_dependency "ping"
 check_dependency "nc" # Netcat, usado para os testes de porta (apt install -y netcat-traditional ou netcat-openbsd)
+
+# Chama a nova função para configurar o /etc/hosts
+configurar_hosts
 
 log_info "🔍 Validando formato dos IPs e máscara de rede..."
 # Validar cada IP do cluster
@@ -179,7 +247,7 @@ log_info "✅ Formato dos IPs em CLUSTER_PEER_IPS verificado."
 
 # Validar formato da rede (ex: 172.20.220.0/24)
 if ! [[ "$CLUSTER_NETWORK" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; then
-    log_info "❌ **ERRO**: Formato de rede inválido em CLUSTER_NETWORK. Use 'IP/MASK' (ex: 172.20.220.0/24)."
+    log_erro "Formato de rede inválido em CLUSTER_NETWORK. Use 'IP/MASK' (ex: 172.20.220.0/24)."
     exit 1
 fi
 log_info "✅ Formato de CLUSTER_NETWORK verificado."
@@ -197,7 +265,7 @@ PVE_VERSION=$(pveversion | grep -oP 'pve-manager/\K\d+\.\d+') # Extrai "8.x"
 REQUIRED_MAJOR_VERSION=8
 
 if (( $(echo "$PVE_VERSION" | cut -d'.' -f1) < $REQUIRED_MAJOR_VERSION )); then
-    echo "❌ **ERRO**: Este script requer Proxmox VE versão $REQUIRED_MAJOR_VERSION.x ou superior. Versão atual detectada: $PVE_VERSION. Não é compatível." | tee -a "$LOG_FILE"
+    log_erro "Este script requer Proxmox VE versão $REQUIRED_MAJOR_VERSION.x ou superior. Versão atual detectada: $PVE_VERSION. Não é compatível."
     exit 1
 elif (( $(echo "$PVE_VERSION" | cut -d'.' -f1) > $REQUIRED_MAJOR_VERSION )); then
     log_info "⚠️ **AVISO**: Este script foi testado para Proxmox VE $REQUIRED_MAJOR_VERSION.x. Versão $PVE_VERSION pode requerer ajustes ou não ser totalmente compatível."
@@ -222,6 +290,15 @@ fi
 # --- Fase 2: Configuração de Tempo e NTP ---
 
 log_info "⏰ Configurando fuso horário para **$TIMEZONE** e sincronização NTP..."
+
+# Adicionado: Verificação de conectividade NTP inicial
+log_info "🔍 Verificando conectividade com servidores NTP externos (pool.ntp.org:123/UDP)..."
+if ! nc -zvu pool.ntp.org 123 &>/dev/null; then
+    log_erro "Falha na conexão com pool.ntp.org na porta 123 (UDP). Verifique conectividade externa e regras de firewall para NTP."
+else
+    log_ok "✅ Conectividade NTP externa OK."
+fi
+
 log_cmd "timedatectl set-timezone $TIMEZONE"
 log_cmd "timedatectl set-ntp true" # Habilita o systemd-timesyncd
 log_cmd "systemctl restart systemd-timesyncd" # Garante que o serviço esteja rodando
@@ -229,14 +306,14 @@ log_cmd "systemctl restart systemd-timesyncd" # Garante que o serviço esteja ro
 log_info "Aguardando e verificando a sincronização NTP inicial..."
 timeout 15 bash -c 'while ! timedatectl status | grep -q "System clock synchronized: yes"; do sleep 1; done'
 if [ $? -ne 0 ]; then
-    echo "⚠️ **AVISO**: Falha na sincronização NTP após 15 segundos! Tentando correção alternativa com ntpdate..." | tee -a "$LOG_FILE"
+    log_info "⚠️ **AVISO**: Falha na sincronização NTP após 15 segundos! Tentando correção alternativa com ntpdate..."
     # Garante que ntpdate esteja instalado antes de usá-lo
     command -v ntpdate &>/dev/null || log_cmd "apt install -y ntpdate"
     # Tenta sincronizar com ntpdate e registra qualquer erro, com múltiplos fallbacks
     ntpdate -s pool.ntp.org >> "$LOG_FILE" 2>&1 \
     || ntpdate -s 0.pool.ntp.org >> "$LOG_FILE" 2>&1 \
     || ntpdate -s 1.pool.ntp.org >> "$LOG_FILE" 2>&1 \
-    || log_info '❌ **ERRO**: Falha grave ao sincronizar com ntpdate após várias tentativas. Verifique a conectividade de rede e as configurações de NTP.'
+    || log_erro 'Falha grave ao sincronizar com ntpdate após várias tentativas. Verifique a conectividade de rede e as configurações de NTP.'
 else
     log_info "✅ Sincronização NTP bem-sucedida."
 fi
@@ -249,13 +326,14 @@ backup_file "/etc/apt/sources.list.d/pve-enterprise.list"
 backup_file "/etc/apt/sources.list"
 backup_file "/etc/apt/sources.list.d/pve-no-subscription.list"
 
-# CORREÇÃO: Adiciona verificação de existência do arquivo antes de tentar modificá-lo
+# CORREÇÃO: Verifica se o arquivo existe antes de tentar modificá-lo
 if [ -f "/etc/apt/sources.list.d/pve-enterprise.list" ]; then
     log_info "Comentando a linha do pve-enterprise.list para desabilitar o repositório de subscrição."
     log_cmd "sed -i 's/^deb/#deb/' /etc/apt/sources.list.d/pve-enterprise.list"
 else
     log_info "ℹ️ Arquivo /etc/apt/sources.list.d/pve-enterprise.list não encontrado. Nenhuma ação necessária para desabilitar o repositório de subscrição."
 fi
+
 
 # Adiciona/sobrescreve os repositórios Debian padrão
 log_cmd "echo 'deb http://ftp.debian.org/debian bookworm main contrib' > /etc/apt/sources.list"
@@ -290,8 +368,8 @@ done
 log_info "✅ Verificação de portas concluída."
 
 log_info "🛡️ Configurando o firewall do Proxmox VE com regras específicas..."
-log_cmd "pve-firewall stop"         # Parar o firewall para aplicar novas regras
-log_cmd "pve-firewall rules --clean" # Limpa todas as regras existentes
+# REMOVIDO: log_cmd "pve-firewall stop" # REMOVIDO DEFINITIVAMENTE!
+# REMOVIDO: log_cmd "pve-firewall rules --clean" # REMOVIDO DEFINITIVAMENTE!
 
 # Regras para permitir acesso ao WebUI (porta 8006) e SSH (porta 22) apenas das redes locais
 log_info "Permitindo acesso ao WebUI (8006) e SSH (22) apenas das redes locais..."
@@ -365,6 +443,15 @@ install_optional_tools
 
 # --- Fase 7: Verificações Pós-Configuração e Finalização ---
 
+log_info "🔍 Verificando status de serviços críticos do Proxmox VE..."
+if ! systemctl is-active corosync pve-cluster pvedaemon; then
+    log_erro "Um ou mais serviços críticos do Proxmox (corosync, pve-cluster, pvedaemon) NÃO estão ativos. Verifique os logs e tente reiniciar manualmente."
+    log_info "O script será encerrado devido à falha de serviço crítico."
+    exit 1
+else
+    log_ok "✅ Todos os serviços críticos do Proxmox VE (corosync, pve-cluster, pvedaemon) estão ativos."
+fi
+
 log_info "🔗 Realizando testes de conectividade essencial do cluster com nós pares..."
 for PEER_IP in "${CLUSTER_PEER_IPS[@]}"; do
     # Obtém o IP principal do próprio nó para evitar testar a si mesmo
@@ -384,18 +471,18 @@ for PEER_IP in "${CLUSTER_PEER_IPS[@]}"; do
     if nc -zv "$PEER_IP" 5404 &>/dev/null; then
         log_info "✅ Conexão Corosync com $PEER_IP (porta 5404) OK."
     else
-        log_info "❌ **FALHA**: Conexão Corosync com $PEER_IP (porta 5404) falhou. Verifique as regras de firewall e a rede."
+        log_erro "Conexão Corosync com $PEER_IP (porta 5404) falhou. Verifique as regras de firewall e a rede."
     fi
     if nc -zv "$PEER_IP" 2224 &>/dev/null; then
         log_info "✅ Conexão pve-cluster com $PEER_IP (porta 2224) OK."
     else
-        log_info "❌ **FALHA**: Conexão pve-cluster com $PEER_IP (porta 2224) falhou. Verifique as regras de firewall e a rede."
+        log_erro "Conexão pve-cluster com $PEER_IP (porta 2224) falhou. Verifique as regras de firewall e a rede."
     fi
     # Teste de ping para a nova regra ICMP
     if ping -c 1 -W 1 "$PEER_IP" &>/dev/null; then
         log_info "✅ Ping com $PEER_IP OK."
     else
-        log_info "❌ **FALHA**: Ping com $PEER_IP falhou. Verifique as regras de firewall (ICMP) e a conectividade de rede."
+        log_erro "Ping com $PEER_IP falhou. Verifique as regras de firewall (ICMP) e a conectividade de rede."
     fi
 done
 
@@ -442,7 +529,7 @@ log_info "✔️ Repositórios atualizados: No-Subscription Proxmox VE e Debian 
 log_info "---------------------------------------------------------"
 log_info "🔍 **PRÓXIMOS PASSOS CRUCIAIS (MANUAIS)**:"
 log_info "1.  **REINICIE O NÓ**: Algumas configurações (especialmente de rede e SSH) só terão efeito total após o reinício. **Isso é fundamental!**"
-log_info "2.  **CRIE O CLUSTER (Primeiro Nó)**: No WebUI do seu primeiro nó, vá em **Datacenter > Cluster > Create Cluster**. Defina um nome para o cluster (ex: Aurora-Luna-Cluster)."
+log_info "2.  **CRIE O CLUSTER (Primeiro Nó)**: No WebUI do seu primeiro nó, vá em **Datacenter > Cluster > Create Cluster**. Defina um nome para o cluster (ex: Aurora-Luna-Cluster).`"
 log_info "3.  **ADICIONE OUTROS NÓS AO CLUSTER**: Nos demais nós, no WebUI, vá em **Datacenter > Cluster > Join Cluster**. Use as informações do primeiro nó (token) para adicioná-los."
 log_info "4.  **CONFIGURE STORAGES**: Após o cluster estar funcional, configure seus storages (LVM-Thin, ZFS, NFS, Ceph, etc.) conforme sua necessidade para armazenar VMs/CTs e ISOs."
 log_info "5.  **CRIE CHAVES SSH (se aplicou hardening)**: Se você aplicou o hardening SSH, configure suas chaves SSH para acesso root antes de fechar a sessão atual, para garantir acesso futuro."
