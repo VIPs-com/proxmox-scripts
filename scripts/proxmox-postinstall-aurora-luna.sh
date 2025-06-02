@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.11 - Foco no Essencial e Usabilidade)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.13 - Foco no Essencial e Usabilidade)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -374,6 +374,20 @@ log_info "Desativando e limpando todas as regras existentes do firewall Proxmox 
 # Reinstala o pacote pve-firewall para garantir que esteja em um estado limpo
 log_cmd "apt --reinstall install -y pve-firewall"
 
+# Reinicia pvedaemon, pois pve-firewall depende dele
+log_info "Reiniciando o serviço pvedaemon para garantir que o firewall possa se comunicar..."
+log_cmd "systemctl restart pvedaemon"
+log_info "Aguardando 5 segundos para pvedaemon iniciar..."
+sleep 5
+
+# Verifica se pvedaemon está ativo
+if ! systemctl is-active pvedaemon; then
+    log_erro "O serviço pvedaemon NÃO está ativo após o reinício. O script será encerrado."
+    exit 1
+else
+    log_ok "✅ Serviço pvedaemon está ativo."
+fi
+
 # Verifica se o firewall está habilitado e desabilita
 if pve-firewall status | grep -q "Status: enabled"; then
     log_info "O firewall Proxmox VE está habilitado. Desativando-o temporariamente."
@@ -383,8 +397,45 @@ else
 fi
 
 # Garante que todas as regras sejam removidas (flush)
-log_cmd "pve-firewall flush"
-log_info "✅ Firewall Proxmox VE desativado e regras limpas com sucesso."
+log_info "Tentando limpar todas as regras do firewall Proxmox VE (flush)..."
+if ! log_cmd "pve-firewall flush"; then
+    log_erro "Falha ao executar 'pve-firewall flush'. Tentando limpar as regras diretamente via iptables/nftables como fallback."
+    # Fallback: tentar limpar iptables/nftables diretamente
+    # CUIDADO: Isso pode bloquear o acesso SSH se não for feito corretamente.
+    # Vamos tentar limpar as chains INPUT, FORWARD, OUTPUT e as tabelas nat, mangle, raw.
+    # Para Proxmox 8, nftables é o padrão, mas iptables-nft é a camada de compatibilidade.
+    # Vamos tentar limpar as regras mais comuns.
+    log_info "Executando iptables -F, iptables -X, iptables -P ACCEPT para todas as chains como fallback..."
+    log_cmd "iptables -F" # Flush all rules in filter table
+    log_cmd "iptables -X" # Delete all non-default chains in filter table
+    log_cmd "iptables -P INPUT ACCEPT" # Set default policy to ACCEPT
+    log_cmd "iptables -P FORWARD ACCEPT"
+    log_cmd "iptables -P OUTPUT ACCEPT"
+
+    log_cmd "iptables -t nat -F" # Flush all rules in nat table
+    log_cmd "iptables -t nat -X" # Delete all non-default chains in nat table
+
+    log_cmd "iptables -t mangle -F" # Flush all rules in mangle table
+    log_cmd "iptables -t mangle -X" # Delete all non-default chains in mangle table
+
+    log_cmd "iptables -t raw -F" # Flush all rules in raw table
+    log_cmd "iptables -t raw -X" # Delete all non-default chains in raw table
+
+    # For IPv6
+    log_info "Executando ip6tables -F, ip6tables -X, ip6tables -P ACCEPT para IPv6 como fallback..."
+    log_cmd "ip6tables -F"
+    log_cmd "ip6tables -X"
+    log_cmd "ip6tables -P INPUT ACCEPT"
+    log_cmd "ip6tables -P FORWARD ACCEPT"
+    log_cmd "ip6tables -P OUTPUT ACCEPT"
+
+    log_info "Reiniciando pve-firewall service após limpeza manual de iptables/nftables."
+    log_cmd "systemctl restart pve-firewall"
+    sleep 2 # Give it a moment to restart
+    log_ok "✅ Regras de firewall limpas via iptables/nftables fallback."
+fi
+
+log_ok "✅ Firewall Proxmox VE desativado e regras limpas com sucesso."
 
 
 # Regras para permitir acesso ao WebUI (porta 8006) e SSH (porta 22) apenas das redes locais
