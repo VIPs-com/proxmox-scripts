@@ -8,7 +8,7 @@
 # 2. Todos os nós estão acessíveis via ping?
 # 3. Tem backup dos dados importantes?
 
-######
+#
 #
 # ✅ Instruções de uso local (alternativa ao método com 'curl'):
 #
@@ -24,7 +24,7 @@
 #       OU
 #       bash /root/post-install.sh
 #
-######
+#
 #
 # 🔹 VLANs Utilizadas:
 #    - 172.20.220.0/24 (Home Lab - Rede principal para comunicação do cluster)
@@ -48,14 +48,14 @@ START_TIME=$(date +%s)            # Início do registro de tempo de execução
 
 # --- INSTRUÇÕES DE EXECUÇÃO ---
 #
-# 📌 **Método Recomendado: Via WebUI (para cada nó)**:
+# 📌 Método Recomendado: Via WebUI (para cada nó):
 #    1. Acesse o Proxmox WebUI em cada host (ex: Aurora: https://172.20.220.20:8006, Luna: https://172.20.220.21:8006).
 #    2. Vá até a seção "**Shell**" de cada nó.
 #    3. Execute o comando: `curl -sL SEU_URL_DO_SCRIPT/post-install.sh | bash`
 #       (Substitua `SEU_URL_DO_SCRIPT` pelo endereço onde você hospedou este script.
 #        Ex: `https://raw.githubusercontent.com/seuusuario/seurepositorio/main/post-install.sh`)
 #
-# 📌 **Método Alternativo: Via SSH (para cada nó)**:
+# 📌 Método Alternativo: Via SSH (para cada nó):
 #    1. Conecte-se via SSH a cada nó individualmente (ex: `ssh root@172.20.220.20`, depois `ssh root@172.20.220.21`).
 #    2. Execute o comando: `curl -sL SEU_URL_DO_SCRIPT/post-install.sh | bash`
 #       (ATENÇÃO: Se aplicar o "Hardening SSH" no final do script, o login de root por senha será desabilitado. Você precisará de chaves SSH para futuros acessos ao root.)
@@ -157,7 +157,7 @@ log_info "📅 **INÍCIO**: Execução do script de pós-instalação no nó **$
 
 ---
 
-### **Fase 1: Verificações Iniciais e Validação de Entrada**
+# Fase 1: Verificações Iniciais e Validação de Entrada
 
 log_info "🔍 Verificando dependências essenciais do sistema (curl, ping, nc)..."
 check_dependency() {
@@ -223,7 +223,7 @@ fi
 
 ---
 
-### **Fase 2: Configuração de Tempo e NTP**
+# Fase 2: Configuração de Tempo e NTP
 
 log_info "⏰ Configurando fuso horário para **$TIMEZONE** e sincronização NTP..."
 log_cmd "timedatectl set-timezone $TIMEZONE"
@@ -247,7 +247,7 @@ fi
 
 ---
 
-### **Fase 3: Gerenciamento de Repositórios e Atualizações**
+# **Fase 3: Gerenciamento de Repositórios e Atualizações
 
 log_info "🗑️ Desabilitando repositório de subscrição e habilitando repositório PVE no-subscription..."
 # Faça backup de arquivos de lista de apt antes de modificar
@@ -279,7 +279,7 @@ log_info "✅ Aviso de assinatura removido do WebUI (se aplicável)."
 
 ---
 
-### **Fase 4: Configuração de Firewall**
+# Fase 4: Configuração de Firewall
 
 log_info "🔍 Verificando portas críticas em uso antes de configurar o firewall..."
 # Lista de portas essenciais para Proxmox e cluster
@@ -310,7 +310,7 @@ log_cmd "pve-firewall localnet --add 172.20.220.0/24 --comment 'Home Lab VLAN (c
 log_cmd "pve-firewall localnet --add 172.21.221.0/24 --comment 'Rede Interna Gerenciamento'"
 log_cmd "pve-firewall localnet --add 172.25.125.0/24 --comment 'Wi-Fi Arkadia'"
 
-# **CRÍTICO**: Regras para comunicação INTERNA DO CLUSTER (Corosync e pve-cluster)
+# CRÍTICO**: Regras para comunicação INTERNA DO CLUSTER (Corosync e pve-cluster)
 # Essas regras são ABSOLUTAMENTE ESSENCIAIS para que os nós do cluster se comuniquem e funcionem corretamente.
 log_info "Permitindo tráfego essencial para comunicação do cluster (Corosync, pve-cluster) na rede **$CLUSTER_NETWORK**..."
 log_cmd "pve-firewall rule --add $CLUSTER_NETWORK --proto udp --dport 5404:5405 --accept --comment 'Corosync entre nós do cluster'"
@@ -334,7 +334,7 @@ log_cmd "pve-firewall start"
 
 ---
 
-### **Fase 5: Hardening de Segurança (Opcional)**
+# Fase 5: Hardening de Segurança (Opcional)
 
 read -p "🔒 Deseja aplicar hardening de segurança (desativar login de root por senha e password authentication)? [s/N] " -n 1 -r -t 10
 echo # Nova linha após a resposta
@@ -352,7 +352,7 @@ fi
 
 ---
 
-### **Fase 6: Instalação de Pacotes Opcionais**
+# Fase 6: Instalação de Pacotes Opcionais
 
 install_optional_tools() {
     echo
@@ -371,7 +371,7 @@ install_optional_tools
 
 ---
 
-### **Fase 7: Verificações Pós-Configuração e Finalização**
+# Fase 7: Verificações Pós-Configuração e Finalização
 
 log_info "🔗 Realizando testes de conectividade essencial do cluster com nós pares..."
 for PEER_IP in "${CLUSTER_PEER_IPS[@]}"; do
@@ -435,7 +435,7 @@ log_info "📋 O log detalhado de todas as operações está disponível em: **$
 
 ---
 
-### **Resumo da Configuração e Próximos Passos**
+# Resumo da Configuração e Próximos Passos
 
 log_info "📝 **RESUMO DA CONFIGURAÇÃO E PRÓXIMOS PASSOS PARA SEU HOMELAB**"
 log_info "---------------------------------------------------------"
