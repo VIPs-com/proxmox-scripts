@@ -6,16 +6,17 @@
 ---
 #!/bin/bash
 
-# Verifica/Instala curl (se não existir)
+#!/bin/bash
+
+# Verifica e instala curl se necessário
 if ! command -v curl &> /dev/null; then
     echo "ℹ️  Instalando curl..."
-    apt-get update && apt-get install -y curl || {
-        echo "❌ Falha ao instalar curl"
+    apt-get update >/dev/null 2>&1 && apt-get install -y curl >/dev/null 2>&1 || {
+        echo "❌ ERRO: Não foi possível instalar o curl automaticamente"
+        echo "👉 Execute manualmente: apt-get update && apt-get install -y curl"
         exit 1
     }
 fi
-
-# Restante do script...
 ---
 
 ## 📌 Funcionalidades
