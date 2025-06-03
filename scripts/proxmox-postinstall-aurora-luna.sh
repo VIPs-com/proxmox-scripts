@@ -557,5 +557,5 @@ if prompt_yes_no "REINÍCIO ALTAMENTE RECOMENDADO: Para garantir que todas as co
 else
     log_info "Reinício adiado. Lembre-se de executar 'reboot' manualmente no nó **$(hostname -s)** o mais rápido possível para aplicar todas as mudanças."
 fi
-
+echo ""
 exit 0
