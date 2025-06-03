@@ -1,48 +1,56 @@
-name: Update CHANGELOG
+name: 📜 Auto Update CHANGELOG
 
 on:
-  workflow_dispatch:
   push:
     branches: [main]
     paths:
-      - 'proxmox-postinstall-aurora-luna.sh'
+      - 'scripts/proxmox-postinstall-aurora-luna.sh'
+  workflow_dispatch:
 
 jobs:
-  update-changelog:
+  changelog:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-    - uses: actions/checkout@v3
+    - name: 🔄 Checkout do repositório
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: Setup Git
+    - name: ⚙️ Configurar Git
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
 
-    - name: Update CHANGELOG
+    - name: 📝 Atualizar CHANGELOG.md
       run: |
+        TODAY=$(date +'%Y-%m-%d')
+
+        # Cria o arquivo se não existir
         if [ ! -f CHANGELOG.md ]; then
-          echo "# Changelog" > CHANGELOG.md
+          echo "# 📜 CHANGELOG - Proxmox Scripts" > CHANGELOG.md
           echo "" >> CHANGELOG.md
         fi
-        
-        TODAY=$(date +'%Y-%m-%d')
-        if grep -q "## \[$TODAY\]" CHANGELOG.md; then
-          echo "Entry already exists for today. Skipping..."
+
+        # Verifica se já existe entrada hoje
+        if grep -q "## [$TODAY]" CHANGELOG.md; then
+          echo "✅ Entrada já existe para hoje. Nada a fazer."
           exit 0
         fi
-        
-        echo "## [$TODAY]" >> CHANGELOG.md
-        echo "### Changed" >> CHANGELOG.md
-        echo "- Automated update" >> CHANGELOG.md
-        echo "" >> CHANGELOG.md
 
-    - name: Commit Changes
+        # Adiciona entrada no topo do arquivo
+        TEMP_FILE=$(mktemp)
+        {
+          echo "## [$TODAY]"
+          echo "- 📦 Script 'proxmox-postinstall-aurora-luna.sh' atualizado automaticamente"
+          echo ""
+          cat CHANGELOG.md
+        } > "$TEMP_FILE" && mv "$TEMP_FILE" CHANGELOG.md
+
+    - name: 🚀 Commit e Push
       run: |
         git add CHANGELOG.md
-        git commit -m "📜 Auto-update CHANGELOG" || echo "No changes to commit"
-        git push
+        git commit -m "📜 Auto-update CHANGELOG for $TODAY" || echo "ℹ️ Nenhuma mudança para commitar"
+        git push origin main
