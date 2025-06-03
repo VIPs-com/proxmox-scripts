@@ -5,6 +5,7 @@
 ![Versão](https://img.shields.io/badge/version-12.1-blue)
 ![Ceph](https://img.shields.io/badge/Ceph-Quincy-red)
 ![License](https://img.shields.io/badge/license-MIT-blue)
+![CHANGELOG Automation](https://github.com/VIPs-com/proxmox-scripts/actions/workflows/update-changelog.yml/badge.svg)
 
 > Scripts automatizados e otimizados para instalação, configuração e hardening de servidores Proxmox VE 8.x no cluster Aurora/Luna, com foco em redes seguras, Ceph no-subscription, sincronização de tempo robusta e firewall por arquivos.
 
@@ -76,29 +77,29 @@ curl -sL https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/scripts
 
 ## 🧰 Boas Práticas Antes de Executar
 
-### 1. Diagnostique sua rede com:
-```bash
-bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh)
-```
-
-### 2. Garanta que os repositórios estejam limpos:
+### 1. Garanta que os repositórios estejam limpos:
 ```bash
 mv /etc/apt/sources.list.d/ceph.list /etc/apt/sources.list.d/ceph.list.bak
 apt update
 ```
 
-### 3. Adicione o repositório correto do Ceph:
+### 2. Adicione o repositório correto do Ceph:
 ```bash
 echo "deb http://download.proxmox.com/debian/ceph-quincy bookworm main" > /etc/apt/sources.list.d/ceph.list
 apt update
 ```
 
-### 4. Certifique-se de que `systemd-timesyncd` está ativo:
+### 3. Certifique-se de que `systemd-timesyncd` está ativo:
 ```bash
 apt install systemd-timesyncd -y
 systemctl enable --now systemd-timesyncd
 systemctl restart systemd-timesyncd
 systemctl status systemd-timesyncd
+```
+
+### 4. Diagnostique sua rede com:
+```bash
+bash <(curl -s https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh)
 ```
 
 ---
