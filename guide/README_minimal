@@ -1,0 +1,25 @@
+# ⚡ Instalação Rápida - Proxmox Scripts (v12.1)
+
+## 1️⃣ Diagnóstico de Rede
+```bash
+curl -sL https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/utils/verifica-rede.sh | bash
+```
+
+## 2️⃣ Pós-Instalação (Firewall, Ceph, NTP, SSH)
+```bash
+curl -sL https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/scripts/proxmox-postinstall-aurora-luna.sh | bash
+```
+
+## ✅ Requisitos Essenciais
+```bash
+apt update && apt install -y curl wget iproute2 dnsutils iputils-ping netcat systemd-timesyncd ntp
+```
+
+## 🛡️ Firewall (portas abertas automaticamente)
+- 22/TCP (SSH)
+- 8006/TCP (WebUI)
+- 5404-5405/UDP (Corosync)
+- 2224/TCP (pve-cluster)
+
+## ℹ️ Site
+https://github.com/VIPs-com/proxmox-scripts
