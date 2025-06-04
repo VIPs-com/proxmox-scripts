@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# diagnostico-proxmox-ambiente.sh - Script de diagnóstico abrangente para ambiente Proxmox VE
+# diagnostico-proxmox-ambiente.sh - Script de diagnóstico abrangente para ambiente Proxmox VE 8x
 # Autor: VIPs-com
 # Versão: 1.v4.0
 # Data: 2025-06-04
