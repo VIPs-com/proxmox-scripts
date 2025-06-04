@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # diagnostico-proxmox-ambiente.sh - Script de diagnóstico abrangente para ambiente Proxmox VE
 # Autor: VIPs-com
-# Versão: 1.v3.0
-# Data: 2025-06-03
+# Versão: 1.v3.1
+# Data: 2025-06-04
 #
 # Uso:
 #   Execute diretamente: ./diagnostico-proxmox-ambiente.sh
@@ -20,14 +20,14 @@ GENERAL_CONNECTIVITY_IPS=("172.20.220.1" "8.8.8.8" "pool.ntp.org")
 # Portas TCP/UDP essenciais do Proxmox e SSH.
 # 22: SSH (TCP)
 # 8006: Proxmox WebUI (TCP)
-# 5404-5407: Corosync (UDP para cluster, ambas são importantes)
-ESSENTIAL_PORTS=("22" "8006" "5404" "5405" "5406" "5407")
+# 5404-5405: Corosync (UDP para cluster, ambas são importantes)
+ESSENTIAL_PORTS=("22" "8006" "5404" "5405") # Removidas 5406 e 5407
 # Interface de rede principal do Proxmox (geralmente vmbr0)
 PROXMOX_BRIDGE_INTERFACE="vmbr0"
 # Host para teste de resolução DNS (direta e reversa)
 DNS_TEST_HOST="google.com"
 # Serviços essenciais do Proxmox VE
-PROXMOX_SERVICES=("corosync" "pve-cluster" "pvedaemon" "pvestatd" "pveproxy" "systemd-timesyncd" "ntp") # Adicionado ntp/timesyncd
+PROXMOX_SERVICES=("corosync" "pve-cluster" "pvedaemon" "pvestatd" "pveproxy" "systemd-timesyncd") # Removido "ntp"
 # Servidores NTP para verificação (adicione os seus, se tiver)
 NTP_SERVERS=("0.pool.ntp.org" "1.pool.ntp.org" "2.pool.ntp.org")
 
@@ -65,7 +65,7 @@ fi
 
 # Argumento para exibir a versão do script.
 if [[ "$1" == "--version" ]]; then
-    echo "diagnostico-proxmox-ambiente.sh v1.1.0"
+    echo "diagnostico-proxmox-ambiente.sh v1.v3.1"
     exit 0
 fi
 
@@ -101,7 +101,7 @@ is_valid_ipv4() {
     local i
     for i in $ip; do
         [[ "$i" -lt 0 || "$i" -gt 255 ]] && return 1
-    done
+    }
     return 0
 }
 
@@ -119,8 +119,8 @@ test_port_connectivity() {
     elif [[ "$proto" == "udp" ]]; then
         # Para UDP, é mais difícil testar a conexão sem um serviço na outra ponta respondendo.
         # nc -uz é uma tentativa, mas pode ser enganoso (sem resposta = OK, mas pode ser bloqueado).
-        # Para Corosync (5404/5405), o teste de ping de cluster é mais relevante.
-        # No entanto, mantemos um teste básico para consistência.
+        # Para Corosync (5404/5405), o teste de ping de cluster é mais relevante,
+        # e o status do pvecm status é a confirmação final.
         timeout "$TIMEOUT" nc -uz "$ip" "$port" 2>/dev/null
         result=$?
     fi
@@ -166,7 +166,7 @@ check_service_status() {
     else
         log_error "Serviço '$service_name' NÃO está ativo. Verifique com 'systemctl status $service_name'."
         return 1
-    fi
+    }
 }
 
 # check_hostname_resolution: Verifica se o hostname resolve para o IP correto (local e outros nós).
@@ -215,10 +215,10 @@ check_ntp_sync() {
         fi
     elif command -v ntpq >/dev/null 2>&1; then
         if ntpq -p >/dev/null 2>&1; then
-            log_success "Serviço NTP parece estar funcionando."
+            log_success "Serviço NTP parece estar funcionando (via ntpq)."
             return 0
         else
-            log_error "Serviço NTP não parece estar funcionando. Verifique 'systemctl status ntp'."
+            log_error "Serviço NTP não parece estar funcionando (via ntpq). Verifique 'systemctl status ntp'."
             return 1
         fi
     else
@@ -431,7 +431,7 @@ else
                 for port in "${ESSENTIAL_PORTS[@]}"; do
                     # Assumimos TCP para SSH e WebUI, UDP para Corosync
                     PROTO="tcp"
-                    if [[ "$port" -ge 5404 && "$port" -le 5407 ]]; then
+                    if [[ "$port" -ge 5404 && "$port" -le 5405 ]]; then # Apenas 5404 e 5405 para Corosync
                         PROTO="udp"
                     fi
 
