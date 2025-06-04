@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # proxmox-postinstall-aurora-luna.sh - Script de pós-instalação e configuração para nós Proxmox VE (Aurora e Luna)
 # Autor: VIPs-com
-# Versão: 1.v3.1
+# Versão: 1.v3.2
 # Data: 2025-06-04
 #
 # Este script automatiza as seguintes tarefas:
 # 1. Atualiza o sistema.
 # 2. Remove o repositório de enterprise do Proxmox e adiciona o de no-subscription.
 # 3. Desabilita a mensagem de "No valid subscription".
-# 4. Instala pacotes essenciais (htop, curl, wget, net-tools, smartmontools, ntp, ifupdown2, nano, sudo).
-# 5. Configura o NTP para sincronização de tempo.
-# 6. Configura o firewall do Proxmox (PVE Firewall).
-# 7. Configura o hostname (se não for "aurora" ou "luna").
-# 8. Cria um cluster Proxmox (se ainda não estiver em um).
+# 4. Instala pacotes essenciais (htop, curl, wget, net-tools, smartmontools, ifupdown2, nano, sudo).
+# 5. Configura o NTP para sincronização de tempo (usando systemd-timesyncd).
+# 6. Configura o firewall do Proxmox (PVE Firewall) com regras corrigidas.
+# 7. **NÃO CONFIGURA HOSTNAME**: Esta etapa é manual e deve ser feita ANTES de executar este script.
+# 8. **NÃO CRIA OU JUNTA CLUSTER**: Esta etapa é manual e deve ser feita ANTES de executar este script.
 # 9. Configura o DNS reverso no /etc/hosts (opcional, para ambiente de lab).
 # 10. Configura o teclado para ABNT2.
 # 11. Instala o Cockpit (opcional).
-# 12. Configura o SSH para permitir login de root e autenticação por senha (AVISO: Menos seguro).
+# 12. Configura o SSH para maior segurança (desabilitando login de root por senha e autenticação por senha).
 #
 # Uso:
 #   Execute como root: bash proxmox-postinstall-aurora-luna.sh
@@ -52,7 +52,7 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-log_info "Iniciando script de pós-instalação e configuração do Proxmox VE (Versão 1.v3.1)..."
+log_info "Iniciando script de pós-instalação e configuração do Proxmox VE (Versão 1.v3.2)..."
 
 # Detecta o hostname atual
 CURRENT_HOSTNAME=$(hostname)
@@ -96,16 +96,28 @@ fi
 # ========== 2. Remover repositório enterprise e adicionar no-subscription ==========
 log_cabecalho "2/12 - Configurando Repositórios Proxmox"
 log_info "Removendo repositório enterprise..."
-sed -i "s/^deb/#deb/" /etc/apt/sources.list.d/pve-enterprise.list
-log_success "Repositório enterprise desabilitado."
+if [ -f "/etc/apt/sources.list.d/pve-enterprise.list" ]; then
+    sed -i "s/^deb/#deb/" /etc/apt/sources.list.d/pve-enterprise.list
+    log_success "Repositório enterprise desabilitado."
+else
+    log_info "Arquivo '/etc/apt/sources.list.d/pve-enterprise.list' não encontrado. Nenhuma ação necessária."
+fi
 
 log_info "Adicionando repositório no-subscription..."
-if ! grep -q "deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription" /etc/apt/sources.list; then
-    echo "deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription" >> /etc/apt/sources.list
+# Garante que o repositório no-subscription esteja apenas em seu próprio arquivo, evitando duplicação
+if ! grep -q "deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription" /etc/apt/sources.list.d/pve-no-subscription.list; then
+    echo "deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription" > /etc/apt/sources.list.d/pve-no-subscription.list
     log_success "Repositório no-subscription adicionado."
 else
-    log_aviso "Repositório no-subscription já existe."
+    log_aviso "Repositório no-subscription já existe em '/etc/apt/sources.list.d/pve-no-subscription.list'."
 fi
+
+# Remove qualquer entrada duplicada de no-subscription em /etc/apt/sources.list
+if grep -q "deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription" /etc/apt/sources.list; then
+    log_info "Removendo entrada duplicada do repositório no-subscription em '/etc/apt/sources.list'."
+    sed -i '/deb http:\/\/download.proxmox.com\/debian\/pve bookworm pve-no-subscription/d' /etc/apt/sources.list
+fi
+
 apt update
 if [[ $? -eq 0 ]]; then
     log_success "apt update após mudança de repositório concluído."
@@ -116,16 +128,18 @@ fi
 # ========== 3. Desabilitar mensagem de "No valid subscription" ==========
 log_cabecalho "3/12 - Desabilitando Mensagem de Assinatura"
 log_info "Desabilitando popup de 'No valid subscription' na interface web..."
-sed -Ezi.bak "s/(Ext.Msg.show\({title: gettext\('No valid subscription'\),.*)/\1\n    void(0);/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+# Expressão sed corrigida para Proxmox VE 8
+sed -i.bak "s/data.status !== 'active'/data.status === 'active'/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
 if [[ $? -eq 0 ]]; then
     log_success "Mensagem de assinatura desabilitada. (Pode ser necessário reiniciar o serviço pveproxy ou o navegador para ver a mudança)."
 else
-    log_error "Falha ao desabilitar a mensagem de assinatura."
+    log_error "Falha ao desabilitar a mensagem de assinatura. Verifique o arquivo '/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js'."
 fi
 
 # ========== 4. Instalar pacotes essenciais ==========
 log_cabecalho "4/12 - Instalando Pacotes Essenciais"
-REQUIRED_PACKAGES="htop curl wget net-tools smartmontools ntp ifupdown2 nano sudo"
+# Removido 'ntp' para evitar conflito com systemd-timesyncd
+REQUIRED_PACKAGES="htop curl wget net-tools smartmontools ifupdown2 nano sudo"
 log_info "Instalando pacotes: ${REQUIRED_PACKAGES}..."
 apt install -y ${REQUIRED_PACKAGES}
 if [[ $? -eq 0 ]]; then
@@ -136,119 +150,137 @@ fi
 
 # ========== 5. Configurar o NTP para sincronização de tempo ==========
 log_cabecalho "5/12 - Configurando Sincronização de Tempo (NTP)"
-log_info "Verificando e configurando NTP..."
+log_info "Verificando e configurando NTP (usando systemd-timesyncd)..."
 # Garante que systemd-timesyncd está ativo e usando pool.ntp.org
 timedatectl set-ntp true
 if [[ $? -eq 0 ]]; then
     log_success "Sincronização de tempo via systemd-timesyncd ativada."
 else
-    log_error "Falha ao ativar sincronização de tempo via systemd-timesyncd."
-fi
-
-# Verifica se o serviço ntp (se instalado) está ativo
-if systemctl is-active --quiet ntp; then
-    log_success "Serviço NTP (daemon) está ativo."
-else
-    log_aviso "Serviço NTP (daemon) não está ativo. Usando systemd-timesyncd para sincronização de tempo."
+    log_error "Falha ao ativar sincronização de tempo via systemd-timesyncd. Pode ser necessário reinstalar o 'systemd-timesyncd' ou verificar o status."
 fi
 
 # Reinicia o serviço para aplicar as configurações
 systemctl restart systemd-timesyncd
-log_success "Serviço systemd-timesyncd reiniciado."
+if [[ $? -eq 0 ]]; then
+    log_success "Serviço systemd-timesyncd reiniciado."
+else
+    log_error "Falha ao reiniciar o serviço systemd-timesyncd. Verifique 'systemctl status systemd-timesyncd'."
+fi
+
+# Opcional: Instala ntpdate como fallback para sincronização manual se necessário
+if ! command -v ntpdate >/dev/null 2>&1; then
+    log_info "Instalando 'ntpdate' como ferramenta de sincronização NTP de fallback..."
+    apt install -y ntpdate
+    if [[ $? -eq 0 ]]; then
+        log_success "'ntpdate' instalado com sucesso."
+    else
+        log_aviso "Falha ao instalar 'ntpdate'. A sincronização manual pode não ser possível."
+    fi
+fi
+
 
 # ========== 6. Configurar o firewall do Proxmox (PVE Firewall) ==========
 log_cabecalho "6/12 - Configurando Firewall do Proxmox VE"
-log_info "Habilitando PVE Firewall..."
-pve-firewall start
-pve-firewall enable
+log_info "Reiniciando o serviço pvedaemon para garantir que o firewall possa se comunicar..."
+systemctl restart pvedaemon
+sleep 5 # Aguarda um pouco para o serviço iniciar
+
+if ! systemctl is-active pvedaemon; then
+    log_error "O serviço pvedaemon NÃO está ativo após o reinício. O firewall pode não funcionar corretamente. O script será encerrado."
+    exit 1
+else
+    log_success "Serviço pvedaemon está ativo."
+fi
+
+log_info "Desativando e limpando todas as regras existentes do firewall Proxmox VE..."
+pve-firewall stop # Garante que o firewall está parado
+pve-firewall flush # Limpa todas as regras existentes
+log_success "Firewall Proxmox VE desativado e regras limpas com sucesso."
+
+log_info "Habilitando e iniciando PVE Firewall..."
+pve-firewall start # Este comando habilita e inicia o firewall
 log_success "PVE Firewall habilitado e iniciado."
 
 log_info "Adicionando regras básicas para o cluster e rede local..."
-# Regras para permitir comunicação de cluster e acesso à web UI
-pve-firewall allow --dir in --proto tcp --dport 8006 # Proxmox Web UI
-pve-firewall allow --dir in --proto tcp --dport 22   # SSH
-pve-firewall allow --dir in --proto udp --dport 5404 # Corosync (cluster)
-pve-firewall allow --dir in --proto udp --dport 5405 # Corosync (cluster)
+# Regras para permitir acesso ao WebUI (porta 8006) e SSH (porta 22) apenas das redes locais
+pve-firewall rule add --dir in --proto tcp --dport 8006 --source 172.20.220.0/24 --action ACCEPT --comment 'Acesso WebUI Home Lab'
+pve-firewall rule add --dir in --proto tcp --dport 8006 --source 172.21.221.0/24 --action ACCEPT --comment 'Acesso WebUI Rede Interna'
+pve-firewall rule add --dir in --proto tcp --dport 8006 --source 172.25.125.0/24 --action ACCEPT --comment 'Acesso WebUI Wi-Fi Arkadia'
+pve-firewall rule add --dir in --proto tcp --dport 22 --source 172.20.220.0/24 --action ACCEPT --comment 'Acesso SSH Home Lab'
+pve-firewall rule add --dir in --proto tcp --dport 22 --source 172.21.221.0/24 --action ACCEPT --comment 'Acesso SSH Rede Interna'
+pve-firewall rule add --dir in --proto tcp --dport 22 --source 172.25.125.0/24 --action ACCEPT --comment 'Acesso SSH Wi-Fi Arkadia'
+log_success "Regras de firewall para WebUI e SSH adicionadas."
 
 # Correção para localnet: adicionar uma por uma
-# A imagem que você me mostrou tinha 172.20.220.0/24;172.21.221.0/24;172.25.125.0/24
-# Vou adicionar cada uma separadamente.
 log_info "Configurando redes locais para o firewall (localnet)..."
-pve-firewall localnet --add 172.20.220.0/24
-pve-firewall localnet --add 172.21.221.0/24
-pve-firewall localnet --add 172.25.125.0/24
+pve-firewall localnet add 172.20.220.0/24 --comment 'Home Lab VLAN (comunicação cluster)'
+pve-firewall localnet add 172.21.221.0/24 --comment 'Rede Interna Gerenciamento'
+pve-firewall localnet add 172.25.125.0/24 --comment 'Wi-Fi Arkadia'
 log_success "Regras de firewall para redes locais adicionadas."
 
-# Regra para permitir tráfego de/para as redes locais
-pve-firewall allow --dir in --source localnet
-pve-firewall allow --dir out --dest localnet
+# Regras para permitir tráfego de/para as redes locais (usando localnet)
+pve-firewall rule add --dir in --source localnet --action ACCEPT --comment 'Permitir entrada de localnet'
+pve-firewall rule add --dir out --dest localnet --action ACCEPT --comment 'Permitir saída para localnet'
 log_success "Regras de firewall para tráfego localnet adicionadas."
+
+# Regras CRÍTICAS para comunicação INTERNA DO CLUSTER (Corosync e pve-cluster)
+log_info "Permitindo tráfego essencial para comunicação do cluster (Corosync, pve-cluster) na rede ${CLUSTER_NETWORK}..."
+pve-firewall rule add --dir in --source "${CLUSTER_NETWORK}" --proto udp --dport 5404 --action ACCEPT --comment 'Corosync UDP 5404'
+pve-firewall rule add --dir in --source "${CLUSTER_NETWORK}" --proto udp --dport 5405 --action ACCEPT --comment 'Corosync UDP 5405'
+pve-firewall rule add --dir in --source "${CLUSTER_NETWORK}" --proto tcp --dport 2224 --action ACCEPT --comment 'pve-cluster TCP 2224'
+log_success "Regras de firewall para comunicação de cluster adicionadas."
+
+# Permitir tráfego ICMP (ping) entre os nós do cluster para facilitar diagnósticos
+log_info "Permitindo tráfego ICMP (ping) entre os nós do cluster..."
+pve-firewall rule add --dir in --source "${CLUSTER_NETWORK}" --proto icmp --action ACCEPT --comment 'Permitir ping entre nós do cluster'
+log_success "Regra de firewall para ping adicionada."
+
+# Regra para permitir tráfego de SAÍDA para NTP (servidores externos)
+log_info "Permitindo tráfego de saída para servidores NTP (porta UDP 123)..."
+pve-firewall rule add --dir out --proto udp --dport 123 --action ACCEPT --comment 'Permitir saída para NTP'
+log_success "Regra de firewall para NTP de saída adicionada."
+
+# Regra final: Bloquear todo o tráfego não explicitamente permitido (default deny)
+log_info "Aplicando regra de bloqueio padrão para todo o tráfego não autorizado..."
+pve-firewall rule add --dir in --source 0.0.0.0/0 --action DROP --comment 'Bloquear tráfego não autorizado por padrão'
+log_success "Regra de bloqueio padrão adicionada."
 
 log_info "Reiniciando PVE Firewall para aplicar as regras..."
 pve-firewall restart
 log_success "PVE Firewall configurado e reiniciado."
 
-# ========== 7. Configurar o hostname (se necessário) ==========
-log_cabecalho "7/12 - Configurando Hostname"
-if [[ "$CURRENT_HOSTNAME" != "$NODE_NAME" ]]; then
-    log_info "Configurando hostname para ${NODE_NAME}..."
-    hostnamectl set-hostname "${NODE_NAME}"
-    echo "${LOCAL_IP} ${NODE_NAME}.local ${NODE_NAME}" >> /etc/hosts # Adiciona ao hosts para resolução local
-    log_success "Hostname configurado para ${NODE_NAME}."
-    log_aviso "Pode ser necessário reiniciar o sistema para que o novo hostname seja totalmente aplicado em todos os serviços."
-else
-    log_info "Hostname já está configurado como ${NODE_NAME}. Nenhuma alteração necessária."
-fi
+# ========== 7. Configurar o hostname (MANUAL) ==========
+log_cabecalho "7/12 - Configurar o hostname (MANUAL)"
+log_info "Esta etapa NÃO é automatizada por este script."
+log_info "Certifique-se de que o hostname deste nó foi configurado manualmente ANTES de executar este script."
+log_info "Você pode configurar o hostname usando o comando 'hostnamectl set-hostname <novo_hostname>' e adicionando uma entrada em /etc/hosts, se necessário."
+log_info "O hostname atual detectado é: ${CURRENT_HOSTNAME}"
 
-# ========== 8. Criar ou juntar-se a um cluster Proxmox ==========
-log_cabecalho "8/12 - Gerenciamento de Cluster Proxmox"
-if ! command -v pvecm >/dev/null 2>&1; then
-    log_aviso "Comando 'pvecm' não encontrado. Proxmox VE pode não estar totalmente instalado ou o pacote 'pve-cluster' está ausente."
-else
-    if pvecm status | grep -q "Cluster Name:"; then
-        log_info "Este nó já faz parte de um cluster."
-        # Verifica se o cluster está quorate
-        if pvecm status | grep -q "Quorate: Yes"; then
-            log_success "Cluster está quorate (OK)."
-        else
-            log_error "Cluster NÃO está quorate! Verifique a comunicação entre os nós."
-        fi
+
+# ========== 8. Gerenciamento de Cluster Proxmox (MANUAL) ==========
+log_cabecalho "8/12 - Gerenciamento de Cluster Proxmox (MANUAL)"
+log_info "Esta etapa NÃO é automatizada por este script."
+log_info "Certifique-se de que seu cluster Proxmox VE foi criado e/ou os nós foram unidos MANUALMENTE via WebUI ANTES de executar este script."
+log_info "Isso garante o controle total sobre a configuração do cluster e a geração de chaves."
+log_info "Verificando se este nó faz parte de um cluster..."
+if pvecm status | grep -q "Cluster Name:"; then
+    log_success "Este nó já faz parte de um cluster. Verifique o status do quorum."
+    if pvecm status | grep -q "Quorate: Yes"; then
+        log_success "Cluster está quorate (OK)."
     else
-        log_info "Este nó não faz parte de um cluster."
-        if [[ "$NODE_NAME" == "aurora" ]]; then
-            log_info "Criando novo cluster '${CLUSTER_NAME}' no nó 'aurora'..."
-            pvecm create "${CLUSTER_NAME}"
-            if [[ $? -eq 0 ]]; then
-                log_success "Cluster '${CLUSTER_NAME}' criado com sucesso."
-            else
-                log_error "Falha ao criar o cluster '${CLUSTER_NAME}'. Verifique os logs."
-            fi
-        elif [[ "$NODE_NAME" == "luna" ]]; then
-            if [[ -z "$PRIMARY_NODE_IP" ]]; then
-                log_error "Para o nó 'luna', a variável PRIMARY_NODE_IP deve ser definida para o IP do nó 'aurora' (ex: export PRIMARY_NODE_IP='172.20.220.20')."
-            else
-                log_info "Tentando juntar o nó 'luna' ao cluster existente em ${PRIMARY_NODE_IP}..."
-                # Solicita a senha do root do nó primário se não for fornecida via CLUSTER_PASSWORD
-                if [[ -z "$CLUSTER_PASSWORD" ]]; then
-                    read -s -p "Digite a senha do root para o nó primário (${PRIMARY_NODE_IP}): " CLUSTER_PASSWORD
-                    echo # Nova linha após a senha
-                fi
-                pvecm add "${PRIMARY_NODE_IP}" -force -api-args "password=${CLUSTER_PASSWORD}"
-                if [[ $? -eq 0 ]]; then
-                    log_success "Nó 'luna' adicionado ao cluster com sucesso."
-                else
-                    log_error "Falha ao adicionar o nó 'luna' ao cluster. Verifique a conectividade e a senha."
-                fi
-            fi
-        else
-            log_aviso "Nome do nó não é 'aurora' nem 'luna'. Não foi possível criar ou juntar-se a um cluster automaticamente."
-        fi
+        log_error "Cluster NÃO está quorate! Verifique a comunicação entre os nós."
     fi
+else
+    log_aviso "Este nó AINDA NÃO faz parte de um cluster. Lembre-se de criar ou juntar o cluster manualmente via WebUI."
 fi
 
-# ========== 9. Configurar o DNS reverso no /etc/hosts (opcional) ==========
+
+# ========== 9. Configurar o DNS reverso em /etc/hosts (opcional) ==========
 log_cabecalho "9/12 - Configurando DNS Reverso em /etc/hosts"
 log_info "Adicionando entradas de DNS reverso para os IPs do cluster em /etc/hosts (se não existirem)..."
+# IPs de peers do cluster Proxmox (adicione todos os nós do cluster, incluindo o próprio)
+# CLUSTER_PEER_IPS=("172.20.220.20" "172.20.220.21")
+# Adicionar IPs do cluster para resolução local
 for ip in "${CLUSTER_PEER_IPS[@]}"; do
     if [[ "$ip" == "172.20.220.20" ]]; then
         HOSTNAME_TO_ADD="aurora.local aurora"
@@ -259,11 +291,17 @@ for ip in "${CLUSTER_PEER_IPS[@]}"; do
     fi
 
     if [[ -n "$HOSTNAME_TO_ADD" ]]; then
-        if ! grep -q "$ip $HOSTNAME_TO_ADD" /etc/hosts; then
-            echo "$ip $HOSTNAME_TO_ADD" >> /etc/hosts
-            log_success "Adicionado '$ip $HOSTNAME_TO_ADD' ao /etc/hosts."
+        # Verifica se a linha já existe para evitar duplicação
+        if ! grep -qE "^${ip}\s+${HOSTNAME_TO_ADD}$" /etc/hosts; then
+            # Se o IP existe mas com hostname diferente, remove a linha antiga
+            if grep -qE "^${ip}\s+" /etc/hosts; then
+                sed -i "/^${ip}\s+/d" /etc/hosts
+                log_info "Removida entrada antiga para ${ip} em /etc/hosts."
+            fi
+            echo "${ip} ${HOSTNAME_TO_ADD}" >> /etc/hosts
+            log_success "Adicionado '${ip} ${HOSTNAME_TO_ADD}' ao /etc/hosts."
         else
-            log_info "Entrada '$ip $HOSTNAME_TO_ADD' já existe em /etc/hosts."
+            log_info "Entrada '${ip} ${HOSTNAME_TO_ADD}' já existe em /etc/hosts. Pulando."
         fi
     fi
 done
@@ -272,13 +310,16 @@ log_success "/etc/hosts configurado."
 # ========== 10. Configurar o teclado para ABNT2 ==========
 log_cabecalho "10/12 - Configurando Teclado ABNT2"
 log_info "Configurando teclado para ABNT2..."
+# Este comando interativo não pode ser totalmente automatizado sem 'debconf-set-selections'
+# Apenas informa o usuário para seguir as instruções
+log_aviso "O comando 'dpkg-reconfigure keyboard-configuration' é interativo. Por favor, selecione as seguintes opções quando solicitado:"
+log_aviso "  - Generic 105-key PC (Intl.)"
+log_aviso "  - Portuguese (Brazil)"
+log_aviso "  - Portuguese (Brazil, abnt2)"
+log_aviso "  - The default for the keyboard layout"
+log_aviso "  - No compose key"
+log_aviso "  - No"
 dpkg-reconfigure keyboard-configuration
-# Selecione 'Generic 105-key PC (Intl.)'
-# Selecione 'Portuguese (Brazil)'
-# Selecione 'Portuguese (Brazil, abnt2)'
-# Selecione 'The default for the keyboard layout'
-# Selecione 'No compose key'
-# Selecione 'No'
 log_success "Configuração de teclado ABNT2 iniciada. Siga as instruções no terminal."
 
 # ========== 11. Instalar o Cockpit (opcional) ==========
@@ -295,38 +336,41 @@ else
     log_info "Cockpit já está instalado."
 fi
 
-# ========== 12. Configurar SSH para permitir login de root e autenticação por senha ==========
-log_cabecalho "12/12 - Configurando SSH (AVISO: Menos Seguro)"
-log_aviso "AVISO: Permitir login de root e autenticação por senha via SSH é MENOS SEGURO."
-log_aviso "Recomenda-se usar autenticação por chave SSH para maior segurança em ambientes de produção."
+# ========== 12. Configurar SSH para maior segurança ==========
+log_cabecalho "12/12 - Configurando SSH para maior segurança"
+log_info "Aplicando hardening SSH: Desabilitando login de root por senha e autenticação por senha..."
+log_aviso "ATENÇÃO: Após esta configuração, o login de root via SSH só será possível usando CHAVES SSH."
+log_aviso "Certifique-se de ter suas chaves SSH configuradas e testadas ANTES de fechar a sessão atual para evitar perder o acesso."
 
 SSH_CONFIG_FILE="/etc/ssh/sshd_config"
-log_info "Configurando SSH para permitir login de root e autenticação por senha..."
+# Faz backup do arquivo de configuração SSH antes de modificar
+cp -p "$SSH_CONFIG_FILE" "${SSH_CONFIG_FILE}.bak_$(date +%Y%m%d%H%M%S)"
+log_info "Backup de '$SSH_CONFIG_FILE' criado."
 
-# Permite login de root
+# Desabilita login de root por senha
 if grep -q "^#PermitRootLogin" "$SSH_CONFIG_FILE"; then
-    sed -i 's/^#PermitRootLogin prohibit-password/PermitRootLogin yes/' "$SSH_CONFIG_FILE"
+    sed -i 's/^#PermitRootLogin.*/PermitRootLogin prohibit-password/' "$SSH_CONFIG_FILE"
 elif grep -q "^PermitRootLogin" "$SSH_CONFIG_FILE"; then
-    sed -i 's/^PermitRootLogin.*/PermitRootLogin yes/' "$SSH_CONFIG_FILE"
+    sed -i 's/^PermitRootLogin.*/PermitRootLogin prohibit-password/' "$SSH_CONFIG_FILE"
 else
-    echo "PermitRootLogin yes" >> "$SSH_CONFIG_FILE"
+    echo "PermitRootLogin prohibit-password" >> "$SSH_CONFIG_FILE"
 fi
 
-# Permite autenticação por senha
+# Desabilita autenticação por senha
 if grep -q "^#PasswordAuthentication" "$SSH_CONFIG_FILE"; then
-    sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication yes/' "$SSH_CONFIG_FILE"
+    sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication no/' "$SSH_CONFIG_FILE"
 elif grep -q "^PasswordAuthentication" "$SSH_CONFIG_FILE"; then
-    sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' "$SSH_CONFIG_FILE"
+    sed -i 's/^PasswordAuthentication.*/PasswordAuthentication no/' "$SSH_CONFIG_FILE"
 else
-    echo "PasswordAuthentication yes" >> "$SSH_CONFIG_FILE"
+    echo "PasswordAuthentication no" >> "$SSH_CONFIG_FILE"
 fi
 
 log_info "Reiniciando serviço SSH..."
 systemctl restart ssh
 if [[ $? -eq 0 ]]; then
-    log_success "Configuração SSH aplicada e serviço reiniciado."
+    log_success "Configuração SSH aplicada e serviço reiniciado. Login de root por senha e autenticação por senha desabilitados."
 else
-    log_error "Falha ao reiniciar o serviço SSH. Verifique a configuração manual."
+    log_error "Falha ao reiniciar o serviço SSH. Verifique a configuração manual e os logs do SSH ('journalctl -xeu ssh')."
 fi
 
 log_cabecalho "Configuração Concluída!"
