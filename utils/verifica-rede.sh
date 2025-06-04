@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # diagnostico-proxmox-ambiente.sh - Script de diagnóstico abrangente para ambiente Proxmox VE
 # Autor: VIPs-com
-# Versão: 1.v4.1
+# Versão: 1.v4.2
 # Data: 2025-06-04
 #
 # Uso:
@@ -65,7 +65,7 @@ fi
 
 # Argumento para exibir a versão do script.
 if [[ "$1" == "--version" ]]; then
-    echo "diagnostico-proxmox-ambiente.sh v1.v4.1"
+    echo "diagnostico-proxmox-ambiente.sh v1.v4.2"
     exit 0
 fi
 
@@ -282,7 +282,7 @@ check_disk_health() {
                         log_success "    Pool '$pool' está ONLINE e saudável."
                     else
                         log_aviso "    Pool '$pool' está ONLINE, mas com avisos/erros. Verifique 'zpool status $pool'."
-                    F
+                    fi # <--- CORRIGIDO: Era 'F' e agora é 'fi'
                 else
                     log_error "    Pool '$pool' NÃO está ONLINE! Verifique 'zpool status $pool' URGENTE!"
                 fi
@@ -403,7 +403,7 @@ check_advanced_network_config() {
     else
         log_error "  Arquivo /etc/network/interfaces não encontrado. Configuração de rede pode estar ausente ou incorreta."
         return 1
-    fi # <--- CORRIGIDO: Era '}' e agora é 'fi'
+    fi
 
     log_info "Verificando status de Bonds (agregação de links):"
     local bonds=$(grep -lR "bond-slaves" /etc/network/interfaces 2>/dev/null | xargs grep -oP 'iface \Kbond\d+' | sort -u)
