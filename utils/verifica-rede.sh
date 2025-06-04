@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # diagnostico-proxmox-ambiente.sh - Script de diagnóstico abrangente para ambiente Proxmox VE
 # Autor: VIPs-com
-# Versão: 1.v3.2
+# Versão: 1.v3.3
 # Data: 2025-06-04
 #
 # Uso:
@@ -205,8 +205,8 @@ check_reverse_dns() {
 check_ntp_sync() {
     local ntp_status
     if command -v timedatectl >/dev/null 2>&1; then
-        ntp_status=$(timedatectl show | grep 'NTP' | awk -F'=' '{print $2}')
-        if [[ "$ntp_status" == "yes" ]]; then
+        # Verifica se a propriedade NTPSynchronized é 'yes'
+        if timedatectl show | grep -q 'NTPSynchronized=yes'; then
             log_success "Sincronização de tempo (NTP) está ativa."
             return 0
         else
