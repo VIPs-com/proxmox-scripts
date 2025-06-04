@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # proxmox-postinstall-aurora-luna.sh - Script de pós-instalação e configuração para nós Proxmox VE (Aurora e Luna)
 # Autor: VIPs-com
-# Versão: 1.v3.2
+# Versão: 1.v3.3
 # Data: 2025-06-04
 #
 # Este script automatiza as seguintes tarefas:
@@ -29,6 +29,7 @@
 #   CLUSTER_NAME="nome_do_cluster" (padrão: home-cluster)
 #   PRIMARY_NODE_IP="ip_do_primeiro_no_do_cluster" (apenas para o segundo nó)
 #   LOCAL_IP="ip_local_deste_no" (se o script não detectar corretamente)
+#   CLUSTER_NETWORK="172.20.220.0/24" # Adicione a rede do seu cluster aqui para regras de firewall
 
 # Cores para a saída do terminal
 VERMELHO='\033[0;31m'
@@ -52,7 +53,7 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-log_info "Iniciando script de pós-instalação e configuração do Proxmox VE (Versão 1.v3.2)..."
+log_info "Iniciando script de pós-instalação e configuração do Proxmox VE (Versão 1.v3.3)..."
 
 # Detecta o hostname atual
 CURRENT_HOSTNAME=$(hostname)
@@ -82,6 +83,13 @@ log_info "Nome do nó definido para: ${NODE_NAME}"
 # Define o nome do cluster (padrão ou via variável de ambiente)
 CLUSTER_NAME=${CLUSTER_NAME:-"home-cluster"}
 log_info "Nome do cluster definido para: ${CLUSTER_NAME}"
+
+# Define a rede do cluster para as regras de firewall (MUITO IMPORTANTE!)
+# Adapte esta variável para a rede que seus nós Proxmox usam para comunicação de cluster.
+# Ex: "172.20.220.0/24" se seus nós estiverem em 172.20.220.20 e 172.20.220.21
+CLUSTER_NETWORK=${CLUSTER_NETWORK:-"172.20.220.0/24"}
+log_info "Rede do Cluster para Firewall definida como: ${CLUSTER_NETWORK}"
+
 
 # ========== 1. Atualizar o sistema ==========
 log_cabecalho "1/12 - Atualizando o sistema"
@@ -151,12 +159,21 @@ fi
 # ========== 5. Configurar o NTP para sincronização de tempo ==========
 log_cabecalho "5/12 - Configurando Sincronização de Tempo (NTP)"
 log_info "Verificando e configurando NTP (usando systemd-timesyncd)..."
+
+# Garante que systemd-timesyncd está instalado
+if ! systemctl is-enabled --quiet systemd-timesyncd; then
+    log_info "Instalando/habilitando systemd-timesyncd..."
+    apt install -y systemd-timesyncd
+    systemctl enable systemd-timesyncd
+    systemctl start systemd-timesyncd
+fi
+
 # Garante que systemd-timesyncd está ativo e usando pool.ntp.org
 timedatectl set-ntp true
 if [[ $? -eq 0 ]]; then
     log_success "Sincronização de tempo via systemd-timesyncd ativada."
 else
-    log_error "Falha ao ativar sincronização de tempo via systemd-timesyncd. Pode ser necessário reinstalar o 'systemd-timesyncd' ou verificar o status."
+    log_error "Falha ao ativar sincronização de tempo via systemd-timesyncd. Verifique o status do serviço."
 fi
 
 # Reinicia o serviço para aplicar as configurações
@@ -203,46 +220,48 @@ log_success "PVE Firewall habilitado e iniciado."
 
 log_info "Adicionando regras básicas para o cluster e rede local..."
 # Regras para permitir acesso ao WebUI (porta 8006) e SSH (porta 22) apenas das redes locais
-pve-firewall rule add --dir in --proto tcp --dport 8006 --source 172.20.220.0/24 --action ACCEPT --comment 'Acesso WebUI Home Lab'
-pve-firewall rule add --dir in --proto tcp --dport 8006 --source 172.21.221.0/24 --action ACCEPT --comment 'Acesso WebUI Rede Interna'
-pve-firewall rule add --dir in --proto tcp --dport 8006 --source 172.25.125.0/24 --action ACCEPT --comment 'Acesso WebUI Wi-Fi Arkadia'
-pve-firewall rule add --dir in --proto tcp --dport 22 --source 172.20.220.0/24 --action ACCEPT --comment 'Acesso SSH Home Lab'
-pve-firewall rule add --dir in --proto tcp --dport 22 --source 172.21.221.0/24 --action ACCEPT --comment 'Acesso SSH Rede Interna'
-pve-firewall rule add --dir in --proto tcp --dport 22 --source 172.25.125.0/24 --action ACCEPT --comment 'Acesso SSH Wi-Fi Arkadia'
+# Sintaxe corrigida: pve-firewall add <rule>
+pve-firewall add host --dir in --proto tcp --dport 8006 --source 172.20.220.0/24 --action ACCEPT --comment 'Acesso WebUI Home Lab'
+pve-firewall add host --dir in --proto tcp --dport 8006 --source 172.21.221.0/24 --action ACCEPT --comment 'Acesso WebUI Rede Interna'
+pve-firewall add host --dir in --proto tcp --dport 8006 --source 172.25.125.0/24 --action ACCEPT --comment 'Acesso WebUI Wi-Fi Arkadia'
+pve-firewall add host --dir in --proto tcp --dport 22 --source 172.20.220.0/24 --action ACCEPT --comment 'Acesso SSH Home Lab'
+pve-firewall add host --dir in --proto tcp --dport 22 --source 172.21.221.0/24 --action ACCEPT --comment 'Acesso SSH Rede Interna'
+pve-firewall add host --dir in --proto tcp --dport 22 --source 172.25.125.0/24 --action ACCEPT --comment 'Acesso SSH Wi-Fi Arkadia'
 log_success "Regras de firewall para WebUI e SSH adicionadas."
 
 # Correção para localnet: adicionar uma por uma
 log_info "Configurando redes locais para o firewall (localnet)..."
+# Sintaxe corrigida: pve-firewall localnet add <network>
 pve-firewall localnet add 172.20.220.0/24 --comment 'Home Lab VLAN (comunicação cluster)'
 pve-firewall localnet add 172.21.221.0/24 --comment 'Rede Interna Gerenciamento'
 pve-firewall localnet add 172.25.125.0/24 --comment 'Wi-Fi Arkadia'
 log_success "Regras de firewall para redes locais adicionadas."
 
 # Regras para permitir tráfego de/para as redes locais (usando localnet)
-pve-firewall rule add --dir in --source localnet --action ACCEPT --comment 'Permitir entrada de localnet'
-pve-firewall rule add --dir out --dest localnet --action ACCEPT --comment 'Permitir saída para localnet'
+pve-firewall add host --dir in --source localnet --action ACCEPT --comment 'Permitir entrada de localnet'
+pve-firewall add host --dir out --dest localnet --action ACCEPT --comment 'Permitir saída para localnet'
 log_success "Regras de firewall para tráfego localnet adicionadas."
 
 # Regras CRÍTICAS para comunicação INTERNA DO CLUSTER (Corosync e pve-cluster)
 log_info "Permitindo tráfego essencial para comunicação do cluster (Corosync, pve-cluster) na rede ${CLUSTER_NETWORK}..."
-pve-firewall rule add --dir in --source "${CLUSTER_NETWORK}" --proto udp --dport 5404 --action ACCEPT --comment 'Corosync UDP 5404'
-pve-firewall rule add --dir in --source "${CLUSTER_NETWORK}" --proto udp --dport 5405 --action ACCEPT --comment 'Corosync UDP 5405'
-pve-firewall rule add --dir in --source "${CLUSTER_NETWORK}" --proto tcp --dport 2224 --action ACCEPT --comment 'pve-cluster TCP 2224'
+pve-firewall add host --dir in --source "${CLUSTER_NETWORK}" --proto udp --dport 5404 --action ACCEPT --comment 'Corosync UDP 5404'
+pve-firewall add host --dir in --source "${CLUSTER_NETWORK}" --proto udp --dport 5405 --action ACCEPT --comment 'Corosync UDP 5405'
+pve-firewall add host --dir in --source "${CLUSTER_NETWORK}" --proto tcp --dport 2224 --action ACCEPT --comment 'pve-cluster TCP 2224'
 log_success "Regras de firewall para comunicação de cluster adicionadas."
 
 # Permitir tráfego ICMP (ping) entre os nós do cluster para facilitar diagnósticos
 log_info "Permitindo tráfego ICMP (ping) entre os nós do cluster..."
-pve-firewall rule add --dir in --source "${CLUSTER_NETWORK}" --proto icmp --action ACCEPT --comment 'Permitir ping entre nós do cluster'
+pve-firewall add host --dir in --source "${CLUSTER_NETWORK}" --proto icmp --action ACCEPT --comment 'Permitir ping entre nós do cluster'
 log_success "Regra de firewall para ping adicionada."
 
 # Regra para permitir tráfego de SAÍDA para NTP (servidores externos)
 log_info "Permitindo tráfego de saída para servidores NTP (porta UDP 123)..."
-pve-firewall rule add --dir out --proto udp --dport 123 --action ACCEPT --comment 'Permitir saída para NTP'
+pve-firewall add host --dir out --proto udp --dport 123 --action ACCEPT --comment 'Permitir saída para NTP'
 log_success "Regra de firewall para NTP de saída adicionada."
 
 # Regra final: Bloquear todo o tráfego não explicitamente permitido (default deny)
 log_info "Aplicando regra de bloqueio padrão para todo o tráfego não autorizado..."
-pve-firewall rule add --dir in --source 0.0.0.0/0 --action DROP --comment 'Bloquear tráfego não autorizado por padrão'
+pve-firewall add host --dir in --source 0.0.0.0/0 --action DROP --comment 'Bloquear tráfego não autorizado por padrão'
 log_success "Regra de bloqueio padrão adicionada."
 
 log_info "Reiniciando PVE Firewall para aplicar as regras..."
