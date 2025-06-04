@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # diagnostico-proxmox-ambiente.sh - Script de diagnóstico abrangente para ambiente Proxmox VE
 # Autor: VIPs-com
-# Versão: 1.v3.1
+# Versão: 1.v3.2
 # Data: 2025-06-04
 #
 # Uso:
@@ -101,7 +101,7 @@ is_valid_ipv4() {
     local i
     for i in $ip; do
         [[ "$i" -lt 0 || "$i" -gt 255 ]] && return 1
-    }
+    done
     return 0
 }
 
@@ -166,7 +166,7 @@ check_service_status() {
     else
         log_error "Serviço '$service_name' NÃO está ativo. Verifique com 'systemctl status $service_name'."
         return 1
-    }
+    fi
 }
 
 # check_hostname_resolution: Verifica se o hostname resolve para o IP correto (local e outros nós).
