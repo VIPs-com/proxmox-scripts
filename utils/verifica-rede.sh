@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # diagnostico-proxmox-ambiente.sh - Script de diagnóstico abrangente para ambiente Proxmox VE
 # Autor: VIPs-com
-# Versão: 1.v3.4
+# Versão: 1.v4.0
 # Data: 2025-06-04
 #
 # Uso:
@@ -65,7 +65,7 @@ fi
 
 # Argumento para exibir a versão do script.
 if [[ "$1" == "--version" ]]; then
-    echo "diagnostico-proxmox-ambiente.sh v1.v3.2"
+    echo "diagnostico-proxmox-ambiente.sh v1.v4.0"
     exit 0
 fi
 
@@ -247,10 +247,200 @@ check_corosync_status() {
     fi
 }
 
+# check_disk_health: Verifica a saúde dos discos via SMART e ZFS
+check_disk_health() {
+    log_cabecalho "8/12 - Verificação de Armazenamento e Discos"
+    if ! command -v smartctl >/dev/null 2>&1; then
+        log_aviso "Comando 'smartctl' não encontrado. Instale 'smartmontools' para verificar a saúde dos discos."
+    else
+        log_info "Verificando saúde dos discos via SMART:"
+        local disks=$(lsblk -dn -o NAME,TYPE | grep disk | awk '{print $1}')
+        if [[ -z "$disks" ]]; then
+            log_aviso "Nenhum disco físico encontrado para verificação SMART."
+        else
+            for disk in $disks; do
+                log_info "  Verificando /dev/$disk..."
+                if smartctl -H /dev/"$disk" | grep -q "SMART overall-health self-assessment test result: PASSED"; then
+                    log_success "    /dev/$disk: Teste SMART passou (OK)."
+                else
+                    log_error "    /dev/$disk: Teste SMART FALHOU ou com avisos! Verifique 'smartctl -a /dev/$disk' para detalhes."
+                fi
+            done
+        fi
+    fi
+
+    if command -v zpool >/dev/null 2>&1; then
+        log_info "Verificando saúde dos pools ZFS:"
+        local zpools=$(zpool list -H -o name)
+        if [[ -z "$zpools" ]]; then
+            log_aviso "Nenhum pool ZFS encontrado."
+        else
+            for pool in $zpools; do
+                log_info "  Verificando pool '$pool'..."
+                if zpool status "$pool" | grep -q "state: ONLINE"; then
+                    if zpool status "$pool" | grep -q "status: The pool is currently healthy"; then
+                        log_success "    Pool '$pool' está ONLINE e saudável."
+                    else
+                        log_aviso "    Pool '$pool' está ONLINE, mas com avisos/erros. Verifique 'zpool status $pool'."
+                    fi
+                else
+                    log_error "    Pool '$pool' NÃO está ONLINE! Verifique 'zpool status $pool' URGENTE!"
+                fi
+            done
+        fi
+    else
+        log_aviso "Comando 'zpool' não encontrado. Ignorando verificação de ZFS."
+    fi
+
+    log_info "Verificando espaço em disco nas partições críticas:"
+    local critical_partitions=("/" "/var" "/boot" "/home" "/tmp")
+    for part in "${critical_partitions[@]}"; do
+        if df -h "$part" >/dev/null 2>&1; then
+            local usage=$(df -h "$part" | awk 'NR==2 {print $5}' | sed 's/%//')
+            if [[ "$usage" -ge 90 ]]; then
+                log_error "  Uso de disco em '$part': ${usage}% (CRÍTICO! Espaço quase esgotado)."
+            elif [[ "$usage" -ge 80 ]]; then
+                log_aviso "  Uso de disco em '$part': ${usage}% (ALTO! Considere liberar espaço)."
+            else
+                log_success "  Uso de disco em '$part': ${usage}% (OK)."
+            fi
+        else
+            log_aviso "  Partição '$part' não encontrada ou não montada. Ignorando verificação de espaço."
+        fi
+    done
+}
+
+# check_system_logs: Analisa logs do sistema para erros e avisos
+check_system_logs() {
+    log_cabecalho "9/12 - Análise de Logs do Sistema"
+    if ! command -v journalctl >/dev/null 2>&1; then
+        log_aviso "Comando 'journalctl' não encontrado. Não é possível analisar logs do sistema."
+    else
+        log_info "Verificando logs do sistema (últimas 50 linhas com erro/aviso):"
+        local journal_output=$(journalctl -p err -p warning -b -n 50 --no-pager 2>/dev/null)
+        if [[ -n "$journal_output" ]]; then
+            log_error "  Erros/Avisos recentes no journalctl detectados. Verifique os logs para detalhes:"
+            echo "$journal_output" | sed 's/^/    /' # Indenta a saída
+        else
+            log_success "  Nenhum erro ou aviso crítico recente no journalctl."
+        fi
+    fi
+
+    if ! command -v dmesg >/dev/null 2>&1; then
+        log_aviso "Comando 'dmesg' não encontrado. Não é possível analisar logs do kernel."
+    else
+        log_info "Verificando logs do kernel (últimas 50 linhas com erro/aviso):"
+        local dmesg_output=$(dmesg -T | tail -n 50 | grep -iE "error|fail|warn|crit" 2>/dev/null)
+        if [[ -n "$dmesg_output" ]]; then
+            log_error "  Erros/Avisos recentes no kernel (dmesg) detectados. Verifique os logs para detalhes:"
+            echo "$dmesg_output" | sed 's/^/    /' # Indenta a saída
+        else
+            log_success "  Nenhum erro ou aviso crítico recente no kernel (dmesg)."
+        fi
+    fi
+}
+
+# check_resource_usage: Verifica a utilização básica de CPU, Memória e Swap
+check_resource_usage() {
+    log_cabecalho "10/12 - Verificação de Utilização de Recursos"
+    log_info "Verificando carga do sistema (Load Average):"
+    local load_avg=$(uptime | awk -F'load average: ' '{print $2}')
+    log_info "  Load Average (1min, 5min, 15min): $load_avg"
+    local load_1min=$(echo "$load_avg" | cut -d',' -f1 | sed 's/ //g')
+    local num_cpus=$(nproc)
+    if (( $(echo "$load_1min > $num_cpus * 0.8" | bc -l) )); then # Se carga > 80% dos CPUs
+        log_aviso "  Carga do sistema (1min) está alta (${load_1min}). Número de CPUs: ${num_cpus}. Pode indicar sobrecarga."
+    else
+        log_success "  Carga do sistema (Load Average) OK."
+    fi
+
+    log_info "Verificando uso de Memória e Swap:"
+    local mem_total=$(free -h | awk '/^Mem:/ {print $2}')
+    local mem_used=$(free -h | awk '/^Mem:/ {print $3}')
+    local mem_free=$(free -h | awk '/^Mem:/ {print $4}')
+    local swap_total=$(free -h | awk '/^Swap:/ {print $2}')
+    local swap_used=$(free -h | awk '/^Swap:/ {print $3}')
+    local swap_percent=$(free | awk '/^Swap:/ {printf "%.0f\n", $3*100/$2 }') # Porcentagem de swap usada
+
+    log_info "  Memória Total: $mem_total, Usada: $mem_used, Livre: $mem_free"
+    log_info "  Swap Total: $swap_total, Usada: $swap_used"
+
+    if [[ "$swap_used" != "0B" && "$swap_percent" -ge 20 ]]; then # Se swap usado e mais de 20%
+        log_aviso "  Uso de Swap está em ${swap_percent}%. Considere adicionar mais RAM ou otimizar o uso de memória."
+    else
+        log_success "  Uso de Memória e Swap OK."
+    fi
+}
+
+# check_proxmox_consistency: Verifica a versão do Proxmox e atualizações pendentes
+check_proxmox_consistency() {
+    log_cabecalho "11/12 - Verificação de Consistência e Atualizações do Proxmox"
+    log_info "Verificando versão do Proxmox VE:"
+    local pve_version=$(pveversion | grep "pve-manager" | awk '{print $2}')
+    if [[ -n "$pve_version" ]]; then
+        log_success "  Versão do Proxmox VE: $pve_version."
+    else
+        log_error "  Não foi possível determinar a versão do Proxmox VE."
+    fi
+
+    log_info "Verificando pacotes pendentes de atualização:"
+    local upgradable_packages=$(apt list --upgradable 2>/dev/null | grep -v "Listing..." | wc -l)
+    if [[ "$upgradable_packages" -gt 0 ]]; then
+        log_aviso "  Há $upgradable_packages pacotes pendentes de atualização. Execute 'apt update && apt dist-upgrade -y'."
+        apt list --upgradable 2>/dev/null | grep -v "Listing..." | sed 's/^/    - /' # Lista os pacotes
+    else
+        log_success "  Nenhum pacote Proxmox ou do sistema pendente de atualização."
+    fi
+}
+
+# check_advanced_network_config: Verifica configurações de rede avançadas como bonds e VLANs
+check_advanced_network_config() {
+    log_cabecalho "12/12 - Verificação de Configuração de Rede Avançada"
+    log_info "Analisando /etc/network/interfaces:"
+    if [ -f "/etc/network/interfaces" ]; then
+        log_info "  Conteúdo de /etc/network/interfaces:"
+        cat /etc/network/interfaces | sed 's/^/    /' # Indenta a saída
+    else
+        log_error "  Arquivo /etc/network/interfaces não encontrado. Configuração de rede pode estar ausente ou incorreta."
+        return 1
+    }
+
+    log_info "Verificando status de Bonds (agregação de links):"
+    local bonds=$(grep -lR "bond-slaves" /etc/network/interfaces 2>/dev/null | xargs grep -oP 'iface \Kbond\d+' | sort -u)
+    if [[ -n "$bonds" ]]; then
+        for bond in $bonds; do
+            log_info "  Verificando bond '$bond'..."
+            if [ -f "/proc/net/bonding/$bond" ]; then
+                local bond_status=$(cat /proc/net/bonding/"$bond" | grep "MII Status" | awk '{print $NF}')
+                local num_slaves=$(cat /proc/net/bonding/"$bond" | grep "Number of Slaves" | awk '{print $NF}')
+                local active_slaves=$(cat /proc/net/bonding/"$bond" | grep "Slave Interface" | grep "Up" | wc -l)
+                log_info "    Status: $bond_status, Slaves: $num_slaves, Ativos: $active_slaves"
+                if [[ "$bond_status" == "up" && "$active_slaves" -eq "$num_slaves" ]]; then
+                    log_success "    Bond '$bond' está ativo e todos os links estão UP."
+                else
+                    log_error "    Bond '$bond' com problemas! Status: $bond_status, Links Ativos: $active_slaves/$num_slaves. Verifique 'cat /proc/net/bonding/$bond'."
+                fi
+            else
+                log_error "  Bond '$bond' configurado, mas /proc/net/bonding/$bond não encontrado. Pode não estar ativo."
+            fi
+        done
+    else
+        log_info "  Nenhum bond (agregação de links) configurado."
+    fi
+
+    log_info "Verificando presença de VLANs:"
+    if grep -q "vlan-raw-device" /etc/network/interfaces; then
+        log_aviso "  VLANs detectadas. Certifique-se de que as configurações de VLAN estão corretas e que os switches estão configurados adequadamente."
+        grep "vlan-raw-device" /etc/network/interfaces | sed 's/^/    - /' # Lista as VLANs
+    else
+        log_info "  Nenhuma VLAN configurada diretamente em /etc/network/interfaces."
+    fi
+}
+
 
 # ========== Checagem de Dependências Essenciais ==========
 log_cabecalho "Verificando Dependências Essenciais do Sistema"
-REQUIRED_COMMANDS=("ping" "dig" "timeout" "ip" "ss" "systemctl")
+REQUIRED_COMMANDS=("ping" "dig" "timeout" "ip" "ss" "systemctl" "awk" "grep" "sed" "lsblk" "df" "free" "uptime" "nproc" "wc")
 # Adicionar ntpq ou timedatectl dependendo do que estiver disponível.
 if command -v timedatectl >/dev/null 2>&1; then
     REQUIRED_COMMANDS+=("timedatectl")
@@ -259,6 +449,18 @@ elif command -v ntpq >/dev/null 2>&1; then
 fi
 if command -v pvecm >/dev/null 2>&1; then # pvecm só existirá se proxmox já estiver instalado
     REQUIRED_COMMANDS+=("pvecm")
+fi
+if command -v smartctl >/dev/null 2>&1; then
+    REQUIRED_COMMANDS+=("smartctl")
+fi
+if command -v zpool >/dev/null 2>&1; then
+    REQUIRED_COMMANDS+=("zpool" "zfs")
+fi
+if command -v journalctl >/dev/null 2>&1; then
+    REQUIRED_COMMANDS+=("journalctl")
+fi
+if command -v dmesg >/dev/null 2>&1; then
+    REQUIRED_COMMANDS+=("dmesg")
 fi
 
 
@@ -275,12 +477,33 @@ for cmd in "${REQUIRED_COMMANDS[@]}"; do
             "timedatectl") log_info "  Sugestão: Faz parte do systemd, verifique a instalação." ;;
             "ntpq") log_info "  Sugestão: apt install -y ntp" ;;
             "pvecm") log_info "  Sugestão: Faça a instalação básica do Proxmox VE." ;;
+            "smartctl") log_info "  Sugestão: apt install -y smartmontools" ;;
+            "zpool"|"zfs") log_info "  Sugestão: apt install -y zfsutils-linux" ;;
+            "journalctl") log_info "  Sugestão: Faz parte do systemd, verifique a instalação." ;;
+            "dmesg") log_info "  Sugestão: Faz parte do kmod, verifique a instalação." ;;
+            "lsblk") log_info "  Sugestão: apt install -y util-linux" ;;
+            "df"|"free") log_info "  Sugestão: apt install -y coreutils" ;;
+            "uptime") log_info "  Sugestão: apt install -y procps" ;;
+            "nproc") log_info "  Sugestão: apt install -y coreutils" ;;
+            "wc") log_info "  Sugestão: apt install -y coreutils" ;;
+            "cat") log_info "  Sugestão: apt install -y coreutils" ;;
+            "grep") log_info "  Sugestão: apt install -y grep" ;;
+            "sed") log_info "  Sugestão: apt install -y sed" ;;
+            "awk") log_info "  Sugestão: apt install -y gawk" ;;
         esac
-        exit 1 # Aborta o script se uma dependência crítica estiver faltando.
+        # Não sai imediatamente aqui, apenas registra o erro, para que o script possa continuar
+        # e reportar todas as dependências ausentes antes de um possível exit final.
+        EXIT_STATUS=1
     else
         log_success "'$cmd' encontrado."
     fi
 done
+
+# Se houver dependências ausentes, aborta aqui.
+if [[ $EXIT_STATUS -ne 0 ]]; then
+    log_error "Algumas dependências essenciais estão ausentes. Por favor, instale-as e execute o script novamente."
+    exit 1
+fi
 
 # ========== Validação Inicial das Configurações do Script ==========
 log_cabecalho "Validando Configurações do Script"
@@ -339,7 +562,7 @@ log_info "IP local deste nó: $IP_LOCAL"
 echo "----------------------------------------"
 
 # 1. Verificação de Conectividade Geral (Internet/Gateway/NTP)
-log_cabecalho "1/7 - Verificando Conectividade Geral (Internet/Gateway/NTP)"
+log_cabecalho "1/12 - Verificando Conectividade Geral (Internet/Gateway/NTP)"
 if [[ ${#GENERAL_CONNECTIVITY_IPS[@]} -eq 0 ]]; then
     log_aviso "Testes de conectividade geral pulados (Nenhum IP/Hostname configurado em GENERAL_CONNECTIVITY_IPS)."
 else
@@ -354,7 +577,7 @@ else
 fi
 
 # 2. Teste de Resolução DNS (Direta e Reversa)
-log_cabecalho "2/7 - Testando Resolução DNS"
+log_cabecalho "2/12 - Testando Resolução DNS"
 # Teste de resolução DNS direta
 log_info "  Testando resolução DNS para $DNS_TEST_HOST..."
 resolved_ip_dns_test=$(dig +short "$DNS_TEST_HOST" 2>/dev/null)
@@ -386,7 +609,7 @@ done
 
 
 # 3. Verificação de Interface de Rede e MTU
-log_cabecalho "3/7 - Verificação de Interface de Rede e MTU"
+log_cabecalho "3/12 - Verificação de Interface de Rede e MTU"
 ip addr show "$PROXMOX_BRIDGE_INTERFACE" &> /dev/null
 if [[ $? -eq 0 ]]; then
     log_success "Interface '$PROXMOX_BRIDGE_INTERFACE' existe."
@@ -405,7 +628,7 @@ else
 fi
 
 # 4. Testes de Latência e Portas entre Nós do Cluster
-log_cabecalho "4/7 - Testes de Latência e Portas (Comunicação de Cluster)"
+log_cabecalho "4/12 - Testes de Latência e Portas (Comunicação de Cluster)"
 if [[ ${#CLUSTER_PEER_IPS[@]} -le 1 ]]; then # Se só tem 1 ou nenhum IP configurado, não é um cluster para testar comunicação entre nós
     log_aviso "Apenas um ou nenhum IP de peer configurado em CLUSTER_PEER_IPS. Testes de comunicação entre nós serão limitados/pulados."
 else
@@ -459,18 +682,33 @@ else
 fi
 
 # 5. Verificação de Sincronização de Tempo (NTP)
-log_cabecalho "5/7 - Verificação de Sincronização de Tempo (NTP)"
+log_cabecalho "5/12 - Verificação de Sincronização de Tempo (NTP)"
 check_ntp_sync
 
 # 6. Verificação dos Serviços Essenciais do Proxmox VE
-log_cabecalho "6/7 - Verificando Serviços Essenciais do Proxmox VE"
+log_cabecalho "6/12 - Verificando Serviços Essenciais do Proxmox VE"
 for servico in "${PROXMOX_SERVICES[@]}"; do
     check_service_status "$servico"
 done
 
 # 7. Verificação do Status do Cluster Corosync (se pvecm estiver disponível)
-log_cabecalho "7/7 - Verificação do Status do Cluster Corosync"
+log_cabecalho "7/12 - Verificação do Status do Cluster Corosync"
 check_corosync_status # Esta função lida com a ausência de pvecm.
+
+# 8. Verificação de Armazenamento e Discos
+check_disk_health
+
+# 9. Análise de Logs do Sistema
+check_system_logs
+
+# 10. Verificação de Utilização de Recursos
+check_resource_usage
+
+# 11. Verificação de Consistência e Atualizações do Proxmox
+check_proxmox_consistency
+
+# 12. Verificação de Configuração de Rede Avançada
+check_advanced_network_config
 
 # ========== Resumo Final e Análise Detalhada ==========
 echo -e "\n${ROXO}📊 ANÁLISE COMPLETA DO DIAGNÓSTICO DO AMBIENTE PROXMOX VE${SEM_COR}"
@@ -498,7 +736,7 @@ else
     if [[ ${#AVISO_DETALHES[@]} -gt 0 ]]; then
         for aviso in "${AVISO_DETALHES[@]}"; do
             echo -e "  - ${AMARELO}${aviso}${SEM_COR}"
-        done
+        }
     else
         log_info "Nenhum aviso adicional foi identificado."
     fi
