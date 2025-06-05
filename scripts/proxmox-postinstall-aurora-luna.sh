@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.14 - Correção Definitiva Localnet Firewall)
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.16 - Firewall Separado)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
+# A configuração do Firewall agora está em um script separado: proxmox-firewall-config.sh
 
 # ✅ Verifique ANTES de executar:
 # 1. Você já criou o cluster via WebUI? (Datacenter > Cluster > Create)
@@ -26,7 +27,7 @@
 #
 #
 #
-# 🔹 VLANs Utilizadas:
+# 🔹 VLANs Utilizadas (para referência, não configuradas diretamente aqui):
 #    - 172.20.220.0/24 (Home Lab - Rede principal para comunicação do cluster)
 #    - 172.21.221.0/24 (Rede Interna - Gerenciamento)
 #    - 172.25.125.0/24 (Wi-Fi Arkadia)
@@ -108,17 +109,11 @@ validate_ip() {
     fi
 }
 
-# Nova função: Configura entradas em /etc/hosts para os nós do cluster
+# Configura entradas em /etc/hosts para os nós do cluster
 configurar_hosts() {
     log_info "📝 Configurando entradas em /etc/hosts para os nós do cluster..."
     backup_file "/etc/hosts" # Faz backup do /etc/hosts antes de modificar
 
-    # Adaptação para usar CLUSTER_PEER_IPS para configurar /etc/hosts
-    # Assumimos que CLUSTER_PEER_IPS contém IPs e que o hostname do nó atual é o correto para seu IP.
-    # Para outros nós, é ideal ter uma lista de IP e Hostname, mas para simplificar,
-    # vamos adicionar apenas o IP do nó atual e os IPs dos pares.
-    # Para um setup mais robusto, CLUSTER_NODES_CONFIG=("IP HOSTNAME" ...) seria melhor.
-    
     local current_ip=$(hostname -I | awk '{print $1}') # Pega o primeiro IP do nó atual
     local current_hostname=$(hostname)
 
@@ -155,7 +150,7 @@ configurar_hosts() {
 # Função para exibir ajuda
 show_help() {
     echo "Uso: $0 [OPÇÃO]"
-    echo "Script para pós-instalação e configuração inicial de um nó Proxmox VE 8."
+    echo "Script para pós-instalação e configuração inicial de um nó Proxmox VE."
     echo ""
     echo "Opções:"
     echo "  -h, --help    Mostra esta mensagem de ajuda e sai."
@@ -355,129 +350,7 @@ log_cmd "echo \"DPkg::Post-Invoke { \\\"dpkg -V proxmox-widget-toolkit | grep -q
 log_cmd "apt --reinstall install -y proxmox-widget-toolkit"
 log_info "✅ Aviso de assinatura removido do WebUI (se aplicável)."
 
-# --- Fase 4: Configuração de Firewall ---
-
-log_info "🔍 Verificando portas críticas em uso antes de configurar o firewall..."
-# Lista de portas essenciais para Proxmox e cluster
-CRITICAL_PORTS="8006 22 5404 5405 2224"
-for port in $CRITICAL_PORTS; do
-    if ss -tuln | grep -q ":$port "; then
-        log_info "⚠️ **AVISO**: Porta TCP/UDP **$port** já está em uso! Verifique se isso não conflitará com as regras do firewall Proxmox. Se estiver em uso pelo Proxmox ou Corosync, isso é normal."
-    fi
-done
-log_info "✅ Verificação de portas concluída."
-
-log_info "🛡️ Configurando o firewall do Proxmox VE com regras específicas..."
-
-# Adicionado: Tentativa de resetar o firewall para um estado limpo
-log_info "Desativando e limpando todas as regras existentes do firewall Proxmox VE..."
-# Reinstala o pacote pve-firewall para garantir que esteja em um estado limpo
-log_cmd "apt --reinstall install -y pve-firewall"
-
-# Reinicia pvedaemon, pois pve-firewall depende dele
-log_info "Reiniciando o serviço pvedaemon para garantir que o firewall possa se comunicar..."
-log_cmd "systemctl restart pvedaemon"
-log_info "Aguardando 5 segundos para pvedaemon iniciar..."
-sleep 5
-
-# Verifica se pvedaemon está ativo
-if ! systemctl is-active pvedaemon; then
-    log_erro "O serviço pvedaemon NÃO está ativo após o reinício. O script será encerrado."
-    exit 1
-else
-    log_ok "✅ Serviço pvedaemon está ativo."
-fi
-
-# Verifica se o firewall está habilitado e desabilita
-if pve-firewall status | grep -q "Status: enabled"; then
-    log_info "O firewall Proxmox VE está habilitado. Desativando-o temporariamente."
-    log_cmd "pve-firewall disable"
-else
-    log_info "O firewall Proxmox VE já está desabilitado ou não está rodando."
-fi
-
-# --- Início da nova lógica de configuração do firewall via host.fw ---
-FIREWALL_DIR="/etc/pve/nodes/$NODE_NAME/firewall"
-HOST_FW_FILE="$FIREWALL_DIR/host.fw"
-
-log_info "Criando diretório para arquivos de configuração do firewall do host: $FIREWALL_DIR..."
-log_cmd "mkdir -p $FIREWALL_DIR"
-
-log_info "Fazendo backup do arquivo de configuração do firewall do host: $HOST_FW_FILE..."
-backup_file "$HOST_FW_FILE"
-
-log_info "Escrevendo novas regras de firewall para $HOST_FW_FILE..."
-# Inicia o arquivo com as opções padrão e política de DROP para entrada
-cat <<EOF > "$HOST_FW_FILE"
-# firewall for host $NODE_NAME
-#
-[OPTIONS]
-enable: 1
-policy_in: DROP
-policy_out: ACCEPT
-
-[RULES]
-# Regras para permitir acesso ao WebUI (porta 8006) e SSH (porta 22) das redes locais
-IN ACCEPT -p tcp -s 172.20.220.0/24 --dport 8006 -j ACCEPT -c "Acesso WebUI Home Lab"
-IN ACCEPT -p tcp -s 172.21.221.0/24 --dport 8006 -j ACCEPT -c "Acesso WebUI Rede Interna"
-IN ACCEPT -p tcp -s 172.25.125.0/24 --dport 8006 -j ACCEPT -c "Acesso WebUI Wi-Fi Arkadia"
-IN ACCEPT -p tcp -s 172.20.220.0/24 --dport 22 -j ACCEPT -c "Acesso SSH Home Lab"
-IN ACCEPT -p tcp -s 172.21.221.0/24 --dport 22 -j ACCEPT -c "Acesso SSH Rede Interna"
-IN ACCEPT -p tcp -s 172.25.125.0/24 --dport 22 -j ACCEPT -c "Acesso SSH Wi-Fi Arkadia"
-
-# CRÍTICO: Regras para comunicação INTERNA DO CLUSTER (Corosync e pve-cluster)
-IN ACCEPT -p udp -s $CLUSTER_NETWORK --dport 5404:5405 -j ACCEPT -c "Corosync entre nós do cluster"
-IN ACCEPT -p tcp -s $CLUSTER_NETWORK --dport 2224 -j ACCEPT -c "pve-cluster entre nós do cluster"
-
-# Permitir tráfego ICMP (ping) entre os nós do cluster para facilitar diagnósticos
-IN ACCEPT -p icmp -s $CLUSTER_NETWORK -j ACCEPT -c "Permitir ping entre os nós do cluster"
-
-# Regra para permitir tráfego de SAÍDA para NTP (servidores externos)
-OUT ACCEPT -p udp --dport 123 -j ACCEPT -c "Permitir saída para NTP"
-
-# A política padrão de entrada (policy_in: DROP) já bloqueia o tráfego não explicitamente permitido.
-# A política padrão de saída (policy_out: ACCEPT) permite a saída por padrão.
-EOF
-log_ok "✅ Regras de firewall escritas em $HOST_FW_FILE."
-
-# NOVO: Configurando 'localnet' diretamente no cluster.fw
-log_info "Configurando 'localnet' para as VLANs internas no firewall do cluster (cluster.fw)..."
-CLUSTER_FW_FILE="/etc/pve/firewall/cluster.fw"
-backup_file "$CLUSTER_FW_FILE"
-
-# Verifica se o arquivo cluster.fw existe, se não, cria-o.
-# Se já existir e contiver uma seção [OPTIONS], insere as localnets nela.
-# Caso contrário, sobrescreve o arquivo com um novo [OPTIONS] e as localnets.
-
-if [ -f "$CLUSTER_FW_FILE" ]; then
-    # Se [OPTIONS] já existe, tenta inserir as localnets dentro dele
-    if grep -q "^\[OPTIONS\]" "$CLUSTER_FW_FILE"; then
-        log_info "Seção [OPTIONS] encontrada em $CLUSTER_FW_FILE. Inserindo localnets..."
-        # Remove localnets antigas se existirem
-        log_cmd "sed -i '/^localnet:/d' $CLUSTER_FW_FILE"
-        # Insere as novas localnets após a linha [OPTIONS]
-        log_cmd "sed -i '/^\\[OPTIONS\\]/a\\localnet: 172.20.220.0/24,172.21.221.0/24,172.25.125.0/24' $CLUSTER_FW_FILE"
-    else
-        # Se [OPTIONS] não existe, adiciona o bloco completo
-        log_info "Seção [OPTIONS] não encontrada em $CLUSTER_FW_FILE. Adicionando bloco OPTIONS com localnets..."
-        # Adiciona o bloco [OPTIONS] e localnets ao final do arquivo
-        log_cmd "echo -e '\n[OPTIONS]\nlocalnet: 172.20.220.0/24,172.21.221.0/24,172.25.125.0/24' >> $CLUSTER_FW_FILE"
-    fi
-else
-    log_info "Arquivo $CLUSTER_FW_FILE não encontrado. Criando e adicionando localnets..."
-    log_cmd "echo -e '[OPTIONS]\nlocalnet: 172.20.220.0/24,172.21.221.0/24,172.25.125.0/24' > $CLUSTER_FW_FILE"
-fi
-log_ok "✅ Configuração de 'localnet' no firewall do cluster concluída."
-
-
-log_info "Ativando e recarregando o serviço de firewall do Proxmox VE para aplicar as novas regras..."
-log_cmd "pve-firewall enable"
-log_cmd "pve-firewall reload" # Usar reload para aplicar as novas regras do host.fw e cluster.fw
-log_ok "✅ Firewall Proxmox VE configurado e recarregado com sucesso."
-
-# --- Fim da nova lógica de configuração do firewall ---
-
-# --- Fase 5: Hardening de Segurança (Opcional) ---
+# --- Fase 4: Hardening de Segurança (Opcional) ---
 
 read -p "🔒 Deseja aplicar hardening de segurança (desativar login de root por senha e password authentication)? [s/N] " -n 1 -r -t 10
 echo # Nova linha após a resposta
@@ -493,7 +366,7 @@ else
     log_info "ℹ️ Hardening SSH ignorado. O login por senha permanece ativo (menos seguro para produção)."
 fi
 
-# --- Fase 6: Instalação de Pacotes Opcionais ---
+# --- Fase 5: Instalação de Pacotes Opcionais ---
 
 install_optional_tools() {
     echo
@@ -510,7 +383,7 @@ install_optional_tools() {
 }
 install_optional_tools
 
-# --- Fase 7: Verificações Pós-Configuração e Finalização ---
+# --- Fase 6: Verificações Pós-Configuração e Finalização ---
 
 log_info "🔍 Verificando status de serviços críticos do Proxmox VE..."
 if ! systemctl is-active corosync pve-cluster pvedaemon; then
@@ -547,11 +420,12 @@ for PEER_IP in "${CLUSTER_PEER_IPS[@]}"; do
     else
         log_erro "Conexão pve-cluster com $PEER_IP (porta 2224) falhou. Verifique as regras de firewall e a rede."
     fi
-    # Teste de ping para a nova regra ICMP
+    # Teste de ping para a nova regra ICMP (se o firewall estiver configurado)
+    # ATENÇÃO: Este ping pode falhar se o script de firewall não tiver sido executado ainda.
     if ping -c 1 -W 1 "$PEER_IP" &>/dev/null; then
         log_info "✅ Ping com $PEER_IP OK."
     else
-        log_erro "Ping com $PEER_IP falhou. Verifique as regras de firewall (ICMP) e a conectividade de rede."
+        log_info "⚠️ **AVISO**: Ping com $PEER_IP falhou. Isso pode ser normal se o script de firewall ainda não foi executado ou se as regras de ICMP não foram aplicadas."
     fi
 done
 
@@ -559,17 +433,13 @@ log_info "🌍 Testando conexão externa (internet) via HTTPS..."
 if nc -zv google.com 443 &>/dev/null; then
     log_info "✅ Conexão externa via HTTPS (google.com:443) OK."
 else
-    log_info "⚠️ **AVISO**: Falha na conexão externa via HTTPS. Verifique as regras de saída do firewall e a conectividade geral com a internet."
+    log_info "⚠️ **AVISO**: Falha na conexão externa via HTTPS. Verifique a conectividade geral com a internet."
 fi
 
 log_info "🧼 Limpando possíveis resíduos de execuções anteriores ou arquivos temporários..."
-# Exemplo de remoção do hook de "no-nag-script" se ele não for mais desejado como permanente
-# MANTENDO o hook, ele se auto-corrige. Se você quiser remover o hook completamente após a primeira execução:
-# log_cmd "rm -f /etc/apt/apt.conf.d/no-nag-script"
 log_info "✅ Limpeza de resíduos concluída."
 
 log_info "🧹 Limpando logs de pós-instalação antigos (com mais de 15 dias) em /var/log/..."
-# Encontra e remove logs mais antigos que 15 dias
 log_cmd "find /var/log -name \"proxmox-postinstall-*.log\" -mtime +15 -exec rm {} \\;"
 log_info "✅ Limpeza de logs antigos concluída."
 
@@ -577,7 +447,7 @@ log_info "✅ Limpeza de logs antigos concluída."
 END_TIME=$(date +%s)
 ELAPSED_TIME=$((END_TIME - START_TIME))
 
-log_info "✅ **FINALIZADO**: Configuração concluída com sucesso no nó **$NODE_NAME** em $(date)."
+log_info "✅ **FINALIZADO**: Configuração inicial do nó **$NODE_NAME** concluída em $(date)."
 log_info "⏳ Tempo total de execução do script: **$ELAPSED_TIME segundos**."
 log_info "📋 O log detalhado de todas as operações está disponível em: **$LOG_FILE**."
 
@@ -586,13 +456,6 @@ log_info "📋 O log detalhado de todas as operações está disponível em: **$
 log_info "📝 **RESUMO DA CONFIGURAÇÃO E PRÓXIMOS PASSOS PARA SEU HOMELAB**"
 log_info "---------------------------------------------------------"
 log_info "✔️ Nó configurado: **$NODE_NAME**"
-log_info "✔️ Firewall Proxmox VE ativo com regras para:"
-log_info "    - Acesso ao WebUI (porta 8006) das redes internas"
-log_info "    - Acesso SSH (porta 22) das redes internas"
-log_info "    - Comunicação interna do cluster (Corosync: 5404-5405, pve-cluster: 2224) na rede '$CLUSTER_NETWORK'"
-log_info "    - Ping (ICMP) entre os nós do cluster"
-log_info "    - Acesso de saída para NTP e Internet (HTTPS)"
-log_info "    - Redes Locais ('localnet') configuradas para: 172.20.220.0/24, 172.21.221.0/24, 172.25.125.0/24"
 log_info "✔️ Hardening SSH (desativa login root por senha): $(grep -q "PermitRootLogin prohibit-password" /etc/ssh/sshd_config && echo "Aplicado" || echo "Não aplicado")"
 log_info "✔️ NTP sincronizado: $(timedatectl show --property=NTPSynchronized --value && echo "Sim" || echo "Não")" # Verifica se NTP está sincronizado
 log_info "✔️ Repositórios atualizados: No-Subscription Proxmox VE e Debian Bookworm"
@@ -601,8 +464,9 @@ log_info "🔍 **PRÓXIMOS PASSO CRUCIAIS (MANUAIS)**:"
 log_info "1.  **REINICIE O NÓ**: Algumas configurações (especialmente de rede e SSH) só terão efeito total após o reinício. **Isso é fundamental!**"
 log_info "2.  **CRIE O CLUSTER (Primeiro Nó)**: No WebUI do seu primeiro nó, vá em **Datacenter > Cluster > Create Cluster**. Defina um nome para o cluster (ex: Aurora-Luna-Cluster)."
 log_info "3.  **ADICIONE OUTROS NÓS AO CLUSTER**: Nos demais nós, no WebUI, vá em **Datacenter > Cluster > Join Cluster**. Use as informações do primeiro nó (token) para adicioná-los."
-log_info "4.  **CONFIGURE STORAGES**: Após o cluster estar funcional, configure seus storages (LVM-Thin, ZFS, NFS, Ceph, etc.) conforme sua necessidade para armazenar VMs/CTs e ISOs."
-log_info "5.  **CRIE CHAVES SSH (se aplicou hardening)**: Se você aplicou o hardening SSH, configure suas chaves SSH para acesso root antes de fechar a sessão atual, para garantir acesso futuro."
+log_info "4.  **CONFIGURE O FIREWALL**: Execute o script `proxmox-firewall-config.sh` (que será criado a seguir) em cada nó para configurar as regras de firewall. **Isso é CRÍTICO para a segurança e funcionalidade da rede!**"
+log_info "5.  **CONFIGURE STORAGES**: Após o cluster estar funcional, configure seus storages (LVM-Thin, ZFS, NFS, Ceph, etc.) conforme sua necessidade para armazenar VMs/CTs e ISOs."
+log_info "6.  **CRIE CHAVES SSH (se aplicou hardening)**: Se você aplicou o hardening SSH, configure suas chaves SSH para acesso root antes de fechar a sessão atual, para garantir acesso futuro."
 log_info "---------------------------------------------------------"
 
 # --- REINÍCIO RECOMENDADO ---
