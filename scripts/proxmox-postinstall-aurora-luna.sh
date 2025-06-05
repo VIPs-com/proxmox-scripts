@@ -2,7 +2,7 @@
 
 # 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna
 # Autor: VIPs-com
-# Versão: 1.2.2
+# Versão: 1.2.4
 # Data: 2025-06-05
 #
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
@@ -17,9 +17,7 @@
 #    1. Crie o cluster no primeiro nó (Datacenter > Cluster > Create Cluster).
 #    2. Junte os outros nós ao cluster (Datacenter > Cluster > Join Cluster).
 #    3. SOMENTE DEPOIS execute este script em CADA NÓ.
-#
-######
-#
+
 # 🔹 VLANs Utilizadas (referência para as regras de firewall):
 #    - 172.20.220.0/24 (Home Lab - Rede principal para comunicação do cluster)
 #    - 172.21.221.0/24 (Rede Interna - Gerenciamento)
@@ -42,11 +40,11 @@ LOG_FILE="/var/log/proxmox-postinstall-$(date +%Y%m%d)-$(hostname).log"
 LOCK_FILE="/etc/proxmox-postinstall.lock"
 START_TIME=$(date +%s) # Início do registro de tempo de execução
 
-# --- Configuração de Robustez ---
+# Configuração de Robustez
 set -e # Sai imediatamente se um comando falhar.
 # set -u # Sai se uma variável não definida for usada (opcional, pode ser muito rigoroso).
 
-# --- FUNÇÕES DE LOG E AUXILIARES ---
+# FUNÇÕES DE LOG E AUXILIARES
 # Cores para a saída no terminal
 VERMELHO='\033[0;31m'
 VERDE='\033[0;32m'
@@ -59,7 +57,7 @@ SEM_COR='\033[0m' # Resetar cor
 overall_script_status=0
 
 # Funções de log padronizadas
-log_cabecalho_fase() { echo -e "\n${ROXO}=== FASE: $1 ===${SEM_COR}" | tee -a "$LOG_FILE"; }
+log_cabecalho_fase() { echo -e "\n${ROXO}FASE: $1${SEM_COR}" | tee -a "$LOG_FILE"; }
 log_info() { echo -e "ℹ️  ${CIANO}$@${SEM_COR}" | tee -a "$LOG_FILE"; }
 log_ok() { echo -e "✅ ${VERDE}$@${SEM_COR}" | tee -a "$LOG_FILE"; }
 log_erro() { echo -e "❌ ${VERMELHO}$@${SEM_COR}" | tee -a "$LOG_FILE"; overall_script_status=1; }
@@ -89,7 +87,7 @@ backup_arquivo() {
         local timestamp=$(date +%Y%m%d%H%M%S)
         local caminho_backup="$dir_backup/$(basename "$arquivo").${timestamp}"
         log_info "📦 Fazendo backup de '$arquivo' para '$caminho_backup'..."
-        executar_comando "cp -p $arquivo $caminho_backup" || { log_aviso "Falha ao criar backup de '$arquivo'."; return 1; }
+        executar_comando "cp -p "$arquivo" "$caminho_backup"" || { log_aviso "Falha ao criar backup de '$arquivo'."; return 1; }
         log_ok "Backup de '$arquivo' criado com sucesso."
     else
         log_info "ℹ️ Arquivo '$arquivo' não encontrado, nenhum backup necessário."
@@ -113,7 +111,7 @@ show_help() {
     exit 0
 }
 
-# --- PROCESSAMENTO DE OPÇÕES E CARREGAMENTO DE CONFIGURAÇÃO EXTERNA ---
+# PROCESSAMENTO DE OPÇÕES E CARREGAMENTO DE CONFIGURAÇÃO EXTERNA
 # Processa opções de linha de comando
 SKIP_LOCK=false
 for arg in "$@"; do
@@ -134,7 +132,7 @@ else
     log_info "ℹ️ Arquivo de configuração /etc/proxmox-postinstall.conf não encontrado. Usando configurações padrão do script."
 fi
 
-# --- INÍCIO DA EXECUÇÃO DO SCRIPT ---
+# INÍCIO DA EXECUÇÃO DO SCRIPT
 # 🔒 Prevenção de Múltiplas Execuções
 if [ "$SKIP_LOCK" = false ] && [ -f "$LOCK_FILE" ]; then
     log_erro "O script já foi executado anteriormente neste nó ($NODE_NAME). Abortando para evitar configurações duplicadas."
@@ -145,7 +143,7 @@ executar_comando "touch $LOCK_FILE" || { log_erro "Falha ao criar arquivo de loc
 
 log_info "📅 INÍCIO: Execução do script de pós-instalação no nó $NODE_NAME em $(date)"
 
-# --- DEFINIÇÃO DAS FASES (FUNÇÕES) ---
+# DEFINIÇÃO DAS FASES (FUNÇÕES)
 
 # Fase 1: Configuração de Tempo e NTP
 configurar_tempo_ntp() {
@@ -260,7 +258,7 @@ instalar_pacotes_opcionais() {
     return 0
 }
 
-# --- FUNÇÃO AUXILIAR PARA TESTE DE CONECTIVIDADE (USADA NAS VERIFICAÇÕES PÓS-CONFIG) ---
+# FUNÇÃO AUXILIAR PARA TESTE DE CONECTIVIDADE (USADA NAS VERIFICAÇÕES PÓS-CONFIG)
 # Esta função foi movida para cá para ser usada SOMENTE nas verificações finais,
 # pois as verificações iniciais são feitas pelo 'diagnostico-proxmox-ambiente.sh'.
 # Uso: test_port_connectivity <IP> <PORTA> [tcp|udp]
@@ -281,7 +279,7 @@ test_port_connectivity() {
 }
 
 
-# --- EXECUÇÃO PRINCIPAL DAS FASES ---
+# EXECUÇÃO PRINCIPAL DAS FASES
 # Array de funções a serem executadas. O script para se uma função retornar falha (1).
 declare -a FASES=(
     "configurar_tempo_ntp"
@@ -297,7 +295,7 @@ for fase_func in "${FASES[@]}"; do
     fi
 done
 
-# --- VERIFICAÇÕES PÓS-CONFIGURAÇÃO E FINALIZAÇÃO ---
+# VERIFICAÇÕES PÓS-CONFIGURAÇÃO E FINALIZAÇÃO
 log_cabecalho_fase "Verificações Pós-Configuração e Finalização"
 
 log_info "🔍 Verificando status de serviços críticos do Proxmox VE..."
@@ -379,9 +377,9 @@ log_info "✅ **FINALIZADO**: Configuração inicial do nó **$NODE_NAME** concl
 log_info "⏳ Tempo total de execução do script: **$ELAPSED_TIME segundos**."
 log_info "📋 O log detalhado de todas as operações está disponível em: **$LOG_FILE**."
 
-# --- Resumo da Configuração e Próximos Passos ---
+# Resumo da Configuração e Próximos Passos
 log_cabecalho_fase "RESUMO DA CONFIGURAÇÃO E PRÓXIMOS PASSOS"
-log_info "📝 **RESUMO DA CONFIGURAÇÃO E PRÓXIMOS PASSO PARA SEU HOMELAB**"
+log_info "📝 **RESUMO DA CONFIGURAÇÃO E PRÓXIMOS PASSOS PARA SEU HOMELAB**"
 log_info "---------------------------------------------------------"
 log_info "✔️ Nó configurado: **$NODE_NAME**"
 log_info "✔️ Firewall Proxmox VE: As regras de firewall DEVEM ser configuradas separadamente com o script `proxmox-firewall-config.sh`."
@@ -403,7 +401,7 @@ log_info "5.  **CRIE CHAVES SSH (se aplicou hardening)**: Se você optou por apl
 log_info "6.  **VERIFIQUE O DIAGNÓSTICO NOVAMENTE**: Execute o 'diagnostico-proxmox-ambiente.sh' novamente para confirmar que todas as pendências foram resolvidas."
 log_info "---------------------------------------------------------"
 
-# --- REINÍCIO RECOMENDADO ---
+# REINÍCIO RECOMENDADO
 echo
 read -p "⟳ **REINÍCIO ALTAMENTE RECOMENDADO**: Para garantir que todas as configurações sejam aplicadas, é **fundamental** reiniciar o nó. Deseja reiniciar agora? [s/N] " -n 1 -r -t 15
 echo # Adiciona uma nova linha após a resposta do usuário ou timeout
