@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 
-# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna
-# Autor: VIPs-com
-# Versão: 1.1.18
-# Data: 2025-06-05
-#
+# 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna (V.1.1.25 - Sem Configuração Firewall Nem Verificações)
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
 
 # ✅ Verifique ANTES de executar:
@@ -30,21 +26,21 @@
 #
 #
 #
-# 🔹 VLANs Utilizadas:
+# 🔹 VLANs Utilizadas (APENAS PARA INFORMAÇÃO, NÃO CONFIGURADAS POR ESTE SCRIPT):
 #    - 172.20.220.0/24 (Home Lab - Rede principal para comunicação do cluster)
 #    - 172.21.221.0/24 (Rede Interna - Gerenciamento)
 #    - 172.25.125.0/24 (Wi-Fi Arkadia)
 
 
 # 🛠️ Configurações Essenciais - Podem ser sobrescritas por /etc/proxmox-postinstall.conf
-CLUSTER_NETWORK="172.20.220.0/24" # Rede para comunicação interna do cluster (Corosync, pve-cluster)
+CLUSTER_NETWORK="172.20.220.0/24" # Rede para comunicação interna do cluster (Corosync, pve-cluster) - Usada para validação, não configuração.
 NODE_NAME=$(hostname)             # Nome do servidor atual
 TIMEZONE="America/Sao_Paulo"     # Fuso horário do sistema
 
-# IPs de outros nós do cluster para testes de conectividade.
-# Adicione TODOS os IPs dos seus nós aqui. O script ignorará o IP do próprio nó durante o teste.
+# IPs e Hostnames de TODOS os nós do cluster para configuração de /etc/hosts e testes de conectividade.
+# Formato: "IP HOSTNAME"
 # Exemplo: Se seus nós são 172.20.220.20 (Aurora) e 172.20.220.21 (Luna):
-CLUSTER_PEER_IPS=("172.20.220.20" "172.20.220.21")
+CLUSTER_NODES_CONFIG=("172.20.220.20 aurora" "172.20.220.21 luna")
 
 LOG_FILE="/var/log/proxmox-postinstall-$(date +%Y%m%d)-$(hostname).log" # Arquivo de log específico por nó
 LOCK_FILE="/etc/proxmox-postinstall.lock" # Garante que o script não seja executado múltiplas vezes
@@ -67,19 +63,9 @@ START_TIME=$(date +%s)            # Início do registro de tempo de execução
 # --- FUNÇÕES AUXILIARES ---
 
 # Funções de Log
-VERMELHO='\033[0;31m'
-VERDE='\033[0;32m'
-AMARELO='\033[1;33m'
-CIANO='\033[0;36m'
-ROXO='\033[0;35m' # Cor para cabeçalhos de fase
-SEM_COR='\033[0m' # Resetar cor
-
-log_info() { printf "\nℹ️ %b%s%b\n" "$CIANO" "$*" "$SEM_COR" | tee -a "$LOG_FILE"; }
-log_ok() { printf "\n✅ %b%s%b\n" "$VERDE" "$*" "$SEM_COR" | tee -a "$LOG_FILE"; }
-log_erro() { printf "\n❌ %b**ERRO**: %s%b\n" "$VERMELHO" "$*" "$SEM_COR" | tee -a "$LOG_FILE"; }
-
-log_cabecalho_fase() { printf "\n%bFASE: %s%b\n" "$ROXO" "$1" "$SEM_COLOR" | tee -a "$LOG_FILE"; }
-
+log_info() { echo -e "\nℹ️ $*" | tee -a "$LOG_FILE"; }
+log_ok() { echo -e "\n✅ $*" | tee -a "$LOG_FILE"; } # Adicionado para mensagens de sucesso
+log_erro() { echo -e "\n❌ **ERRO**: $*" | tee -a "$LOG_FILE"; } # Adicionado para mensagens de erro (não críticas para abortar)
 
 log_cmd() {
     echo -e "\n🔹 Executando Comando: $*" | tee -a "$LOG_FILE"
@@ -122,49 +108,32 @@ validate_ip() {
     fi
 }
 
-# Nova função: Configura entradas em /etc/hosts para os nós do cluster
+# NOVA FUNÇÃO: Configura entradas em /etc/hosts para todos os nós do cluster
 configurar_hosts() {
     log_info "📝 Configurando entradas em /etc/hosts para os nós do cluster..."
     backup_file "/etc/hosts" # Faz backup do /etc/hosts antes de modificar
 
-    # Adaptação para usar CLUSTER_PEER_IPS para configurar /etc/hosts
-    # Assumimos que CLUSTER_PEER_IPS contém IPs e que o hostname do nó atual é o correto para seu IP.
-    # Para outros nós, é ideal ter uma lista de IP e Hostname, mas para simplificar,
-    # vamos adicionar apenas o IP do nó atual e os IPs dos pares.
-    # Para um setup mais robusto, CLUSTER_NODES_CONFIG=("IP HOSTNAME" ...) seria melhor.
-    
     local current_ip=$(hostname -I | awk '{print $1}') # Pega o primeiro IP do nó atual
     local current_hostname=$(hostname)
 
-    # Adiciona o próprio nó
-    if ! grep -qE "^$current_ip\s+$current_hostname(\s+|$)" /etc/hosts; then
-        if grep -qE "^$current_ip\s+" /etc/hosts; then
-            log_info "Removendo entrada existente para IP '$current_ip' em /etc/hosts antes de adicionar o hostname correto."
-            log_cmd "sed -i '/^$current_ip\s\+/d' /etc/hosts"
-        fi
-        log_info "Adicionando entrada: '$current_ip $current_hostname' a /etc/hosts."
-        log_cmd "echo \"$current_ip $current_hostname\" >> /etc/hosts"
-    else
-        log_info "Entrada '$current_ip $current_hostname' já existe em /etc/hosts. Pulando."
-    fi
+    for node_entry in "${CLUSTER_NODES_CONFIG[@]}"; do
+        ip=$(echo "$node_entry" | awk '{print $1}')
+        hostname=$(echo "$node_entry" | awk '{print $2}')
 
-    # Adiciona os IPs dos pares (sem hostname, pois CLUSTER_PEER_IPS não os contém)
-    # Para um ambiente de cluster, é ALTAMENTE recomendado que todos os nós tenham os hostnames dos outros nós em /etc/hosts ou via DNS.
-    # Como CLUSTER_PEER_IPS só tem IPs, vamos adicionar apenas os IPs para garantir a resolução básica.
-    for peer_ip in "${CLUSTER_PEER_IPS[@]}"; do
-        if [ "$peer_ip" = "$current_ip" ]; then
-            continue # Não adiciona o próprio IP novamente
+        if [ -z "$ip" ] || [ -z "$hostname" ]; then
+            log_erro "Formato inválido em CLUSTER_NODES_CONFIG: '$node_entry'. Esperado 'IP HOSTNAME'."
+            exit 1
         fi
-        if ! grep -qE "^$peer_ip\s+" /etc/hosts; then # Verifica se o IP já existe
-            log_info "Adicionando entrada para IP de peer: '$peer_ip' a /etc/hosts (sem hostname, pois não está disponível)."
-            log_cmd "echo \"$peer_ip\" >> /etc/hosts" # Adiciona apenas o IP
-        else
-            log_info "Entrada para IP de peer '$peer_ip' já existe em /etc/hosts. Pulando."
-        fi
+
+        # Remove qualquer linha existente com o IP ou hostname para evitar duplicatas ou conflitos
+        log_cmd "sed -i '/^$ip\s\+\|^.*\s\+$hostname$/d' /etc/hosts"
+
+        # Adiciona a nova entrada
+        log_info "Adicionando entrada: '$ip $hostname' a /etc/hosts."
+        log_cmd "echo \"$ip $hostname\" >> /etc/hosts"
     done
     log_ok "✅ Configuração de /etc/hosts concluída."
 }
-
 
 # Função para exibir ajuda
 show_help() {
@@ -177,7 +146,7 @@ show_help() {
     echo ""
     echo "Variáveis de configuração podem ser definidas em /etc/proxmox-postinstall.conf"
     echo "Exemplo: CLUSTER_NETWORK=\"192.168.1.0/24\""
-    echo "         CLUSTER_PEER_IPS=(\"192.168.1.10\" \"192.168.1.11\")"
+    echo "         CLUSTER_NODES_CONFIG=(\"192.168.1.10 node1\" \"192.168.1.11 node2\")"
     echo "         TIMEZONE=\"America/New_York\""
     exit 0
 }
@@ -224,6 +193,9 @@ fi
 
 # --- INÍCIO DA EXECUÇÃO DO SCRIPT ---
 
+# Adicionado: Registro da versão do script
+log_info "🧾 Versão do script: v1.1.25"
+
 # 🔒 Prevenção de Múltiplas Execuções
 if [[ "$SKIP_LOCK" == "false" && -f "$LOCK_FILE" ]]; then
     log_erro "O script já foi executado anteriormente neste nó ($NODE_NAME). Abortando para evitar configurações duplicadas."
@@ -235,8 +207,6 @@ touch "$LOCK_FILE" # Cria o arquivo de lock
 log_info "📅 **INÍCIO**: Execução do script de pós-instalação no nó **$NODE_NAME** em $(date)"
 
 # --- Fase 1: Verificações Iniciais e Validação de Entrada ---
-
-log_cabecalho_fase "1/7 - Verificações Iniciais e Validação de Entrada"
 
 log_info "🔍 Verificando dependências essenciais do sistema (curl, ping, nc)..."
 check_dependency() {
@@ -256,10 +226,11 @@ configurar_hosts
 
 log_info "🔍 Validando formato dos IPs e máscara de rede..."
 # Validar cada IP do cluster
-for ip in "${CLUSTER_PEER_IPS[@]}"; do
+for node_entry in "${CLUSTER_NODES_CONFIG[@]}"; do
+    ip=$(echo "$node_entry" | awk '{print $1}')
     validate_ip "$ip"
 done
-log_info "✅ Formato dos IPs em CLUSTER_PEER_IPS verificado."
+log_info "✅ Formato dos IPs em CLUSTER_NODES_CONFIG verificado."
 
 # Validar formato da rede (ex: 172.20.220.0/24)
 if ! [[ "$CLUSTER_NETWORK" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; then
@@ -268,12 +239,41 @@ if ! [[ "$CLUSTER_NETWORK" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0
 fi
 log_info "✅ Formato de CLUSTER_NETWORK verificado."
 
-log_info "🔍 Verificando conectividade de rede com os repositórios Debian..."
-ping -c 4 ftp.debian.org &>/dev/null
-if [ $? -ne 0 ]; then
-    log_info "⚠️ **AVISO**: Não foi possível pingar 'ftp.debian.org'. A conectividade com a internet pode estar comprometida. As atualizações e instalações podem falhar."
+# NOVA VALIDAÇÃO: Hostname único
+log_info "🔍 Validando hostname do nó atual..."
+local_hostname=$(hostname)
+local_ip=$(hostname -I | awk '{print $1}')
+found_in_config=false
+
+for node_entry in "${CLUSTER_NODES_CONFIG[@]}"; do
+    ip=$(echo "$node_entry" | awk '{print $1}')
+    hostname_from_config=$(echo "$node_entry" | awk '{print $2}')
+    if [ "$local_hostname" = "$hostname_from_config" ] && [ "$local_ip" = "$ip" ]; then
+        found_in_config=true
+        break
+    fi
+done
+
+if [ "$found_in_config" = false ]; then
+    log_erro "O hostname e/ou IP do nó atual ($local_hostname - $local_ip) não corresponde a nenhuma entrada em CLUSTER_NODES_CONFIG. Por favor, corrija CLUSTER_NODES_CONFIG."
+    exit 1
 else
+    log_ok "✅ Hostname do nó atual ($local_hostname) validado com sucesso na configuração."
+fi
+
+
+log_info "🔍 Verificando conectividade de rede com os repositórios Debian e DNS..."
+# Teste de ping para um servidor de DNS (google.com)
+if ping -c 4 google.com &>/dev/null; then
+    log_info "✅ Conectividade com a internet e resolução de DNS OK (ping google.com)."
+else
+    log_info "⚠️ **AVISO**: Não foi possível pingar 'google.com'. A conectividade com a internet ou resolução de DNS pode estar comprometida. As atualizações e instalações podem falhar."
+fi
+# Teste para repositórios Debian
+if ping -c 4 ftp.debian.org &>/dev/null; then
     log_info "✅ Conectividade com repositórios Debian OK."
+else
+    log_info "⚠️ **AVISO**: Não foi possível pingar 'ftp.debian.org'. A conectividade com a internet pode estar comprometida. As atualizações e instalações podem falhar."
 fi
 
 log_info "🔍 Verificando a versão do Proxmox VE..."
@@ -305,8 +305,6 @@ fi
 
 # --- Fase 2: Configuração de Tempo e NTP ---
 
-log_cabecalho_fase "2/7 - Configuração de Tempo e NTP"
-
 log_info "⏰ Configurando fuso horário para **$TIMEZONE** e sincronização NTP..."
 
 # Adicionado: Verificação de conectividade NTP inicial
@@ -333,12 +331,10 @@ if [ $? -ne 0 ]; then
     || ntpdate -s 1.pool.ntp.org >> "$LOG_FILE" 2>&1 \
     || log_erro 'Falha grave ao sincronizar com ntpdate após várias tentativas. Verifique a conectividade de rede e as configurações de NTP.'
 else
-    log_ok "✅ Sincronização NTP bem-sucedida."
+    log_info "✅ Sincronização NTP bem-sucedida."
 fi
 
 # --- Fase 3: Gerenciamento de Repositórios e Atualizações ---
-
-log_cabecalho_fase "3/7 - Gerenciamento de Repositórios e Atualizações"
 
 log_info "🗑️ Desabilitando repositório de subscrição e habilitando repositório PVE no-subscription..."
 # Faça backup de arquivos de lista de apt antes de modificar
@@ -373,137 +369,13 @@ log_info "🧹 Removendo o aviso de assinatura Proxmox VE do WebUI (se não poss
 log_cmd "echo \"DPkg::Post-Invoke { \\\"dpkg -V proxmox-widget-toolkit | grep -q '/proxmoxlib.js$'; if [ \\\$? -eq 1 ]; then sed -i '/.*data.status.*{/{s/\\!//;s/active/NoMoreNagging/}' /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js; fi\\\"; };\" > /etc/apt/apt.conf.d/no-nag-script"
 # Reinstala o pacote para aplicar a modificação imediatamente (ou após futuras atualizações do pacote)
 log_cmd "apt --reinstall install -y proxmox-widget-toolkit"
-log_ok "✅ Aviso de assinatura removido do WebUI (se aplicável)."
+log_info "✅ Aviso de assinatura removido do WebUI (se aplicável)."
 
-# --- Fase 4: Configuração de Firewall ---
-
-log_cabecalho_fase "4/7 - Configuração de Firewall"
-
-log_info "🔍 Verificando portas críticas em uso antes de configurar o firewall..."
-# Lista de portas essenciais para Proxmox e cluster
-CRITICAL_PORTS="8006 22 5404 5405 2224"
-for port in $CRITICAL_PORTS; do
-    if ss -tuln | grep -q ":$port "; then
-        log_info "⚠️ **AVISO**: Porta TCP/UDP **$port** já está em uso! Verifique se isso não conflitará com as regras do firewall Proxmox. Se estiver em uso pelo Proxmox ou Corosync, isso é normal."
-    fi
-done
-log_info "✅ Verificação de portas concluída."
-
-log_info "🛡️ Configurando o firewall do Proxmox VE com regras específicas..."
-
-# Adicionado: Tentativa de resetar o firewall para um estado limpo
-log_info "Desativando e limpando todas as regras existentes do firewall Proxmox VE..."
-# Reinstala o pacote pve-firewall para garantir que esteja em um estado limpo
-log_cmd "apt --reinstall install -y pve-firewall"
-
-# Reinicia pvedaemon, pois pve-firewall depende dele
-log_info "Reiniciando o serviço pvedaemon para garantir que o firewall possa se comunicar..."
-log_cmd "systemctl restart pvedaemon"
-log_info "Aguardando 5 segundos para pvedaemon iniciar..."
-sleep 5
-
-# Verifica se pvedaemon está ativo
-if ! systemctl is-active pvedaemon; then
-    log_erro "O serviço pvedaemon NÃO está ativo após o reinício. O script será encerrado."
-    exit 1
-else
-    log_ok "✅ Serviço pvedaemon está ativo."
-fi
-
-# Verifica se o firewall está habilitado e desabilita
-if pve-firewall status | grep -q "Status: enabled"; then
-    log_info "O firewall Proxmox VE está habilitado. Desativando-o temporariamente."
-    log_cmd "pve-firewall disable"
-else
-    log_info "O firewall Proxmox VE já está desabilitado ou não está rodando."
-fi
-
-# --- Início da nova lógica de configuração do firewall via host.fw ---
-FIREWALL_DIR="/etc/pve/nodes/$NODE_NAME/firewall"
-HOST_FW_FILE="$FIREWALL_DIR/host.fw"
-
-log_info "Criando diretório para arquivos de configuração do firewall do host: $FIREWALL_DIR..."
-log_cmd "mkdir -p $FIREWALL_DIR"
-
-log_info "Fazendo backup do arquivo de configuração do firewall do host: $HOST_FW_FILE..."
-backup_file "$HOST_FW_FILE"
-
-log_info "Escrevendo novas regras de firewall para $HOST_FW_FILE..."
-# Inicia o arquivo com as opções padrão e política de DROP para entrada
-cat <<EOF > "$HOST_FW_FILE"
-# firewall for host $NODE_NAME
-#
-[OPTIONS]
-enable: 1
-policy_in: DROP
-policy_out: ACCEPT
-
-[RULES]
-# Regras para permitir acesso ao WebUI (porta 8006) e SSH (porta 22) das redes locais
-IN ACCEPT -p tcp -s 172.20.220.0/24 --dport 8006 -j ACCEPT -c "Acesso WebUI Home Lab"
-IN ACCEPT -p tcp -s 172.21.221.0/24 --dport 8006 -j ACCEPT -c "Acesso WebUI Rede Interna"
-IN ACCEPT -p tcp -s 172.25.125.0/24 --dport 8006 -j ACCEPT -c "Acesso WebUI Wi-Fi Arkadia"
-IN ACCEPT -p tcp -s 172.20.220.0/24 --dport 22 -j ACCEPT -c "Acesso SSH Home Lab"
-IN ACCEPT -p tcp -s 172.21.221.0/24 --dport 22 -j ACCEPT -c "Acesso SSH Rede Interna"
-IN ACCEPT -p tcp -s 172.25.125.0/24 --dport 22 -j ACCEPT -c "Acesso SSH Wi-Fi Arkadia"
-
-# CRÍTICO: Regras para comunicação INTERNA DO CLUSTER (Corosync e pve-cluster)
-IN ACCEPT -p udp -s $CLUSTER_NETWORK --dport 5404:5405 -j ACCEPT -c "Corosync entre nós do cluster"
-IN ACCEPT -p tcp -s $CLUSTER_NETWORK --dport 2224 -j ACCEPT -c "pve-cluster entre nós do cluster"
-
-# Permitir tráfego ICMP (ping) entre os nós do cluster para facilitar diagnósticos
-IN ACCEPT -p icmp -s $CLUSTER_NETWORK -j ACCEPT -c "Permitir ping entre os nós do cluster"
-
-# Regra para permitir tráfego de SAÍDA para NTP (servidores externos)
-OUT ACCEPT -p udp --dport 123 -j ACCEPT -c "Permitir saída para NTP"
-
-# A política padrão de entrada (policy_in: DROP) já bloqueia o tráfego não explicitamente permitido.
-# A política padrão de saída (policy_out: ACCEPT) permite a saída por padrão.
-EOF
-log_ok "✅ Regras de firewall escritas em $HOST_FW_FILE."
-
-# NOVO: Configurando 'localnet' diretamente no cluster.fw
-log_info "Configurando 'localnet' para as VLANs internas no firewall do cluster (cluster.fw)..."
-CLUSTER_FW_FILE="/etc/pve/firewall/cluster.fw"
-backup_file "$CLUSTER_FW_FILE"
-
-# Redes para serem adicionadas ao localnet, separadas por ponto e vírgula
-LOCAL_NETWORKS_LIST="172.20.220.0/24;172.21.221.0/24;172.25.125.0/24"
-
-if [ -f "$CLUSTER_FW_FILE" ]; then
-    # Se [OPTIONS] já existe, tenta inserir as localnets dentro dele
-    if grep -q "^\[OPTIONS\]" "$CLUSTER_FW_FILE"; then
-        log_info "Seção [OPTIONS] encontrada em $CLUSTER_FW_FILE. Inserindo localnets..."
-        # Remove localnets antigas se existirem
-        log_cmd "sed -i '/^localnet:/d' $CLUSTER_FW_FILE"
-        # Insere as novas localnets após a linha [OPTIONS]
-        log_cmd "sed -i '/^\\[OPTIONS\\]/a\\localnet: $LOCAL_NETWORKS_LIST' $CLUSTER_FW_FILE"
-    else
-        # Se [OPTIONS] não existe, adiciona o bloco completo
-        log_info "Seção [OPTIONS] não encontrada em $CLUSTER_FW_FILE. Adicionando bloco OPTIONS com localnets..."
-        # Adiciona o bloco [OPTIONS] e localnets ao final do arquivo
-        log_cmd "echo -e '\n[OPTIONS]\nlocalnet: $LOCAL_NETWORKS_LIST' >> $CLUSTER_FW_FILE"
-    fi
-else
-    log_info "Arquivo $CLUSTER_FW_FILE não encontrado. Criando e adicionando localnets..."
-    log_cmd "echo -e '[OPTIONS]\nlocalnet: $LOCAL_NETWORKS_LIST' > $CLUSTER_FW_FILE"
-fi
-log_ok "✅ Configuração de 'localnet' no firewall do cluster concluída."
-
-
-log_info "Ativando e recarregando o serviço de firewall do Proxmox VE para aplicar as novas regras..."
-# Tenta reiniciar o firewall diretamente, que é mais robusto para aplicar novas configurações
-if ! log_cmd "pve-firewall restart"; then
-    log_erro "Falha ao reiniciar o firewall Proxmox VE. Tentando recarregar as regras como fallback."
-    log_cmd "pve-firewall reload" # Fallback para reload se restart falhar
-fi
-log_ok "✅ Firewall Proxmox VE configurado e recarregado com sucesso."
-
-# --- Fim da nova lógica de configuração do firewall ---
+# --- Fase 4: (Removida) Configuração e Verificação de Firewall ---
+# Esta fase foi completamente removida conforme sua solicitação.
+# A configuração do firewall será tratada por um script separado e as verificações serão feitas externamente.
 
 # --- Fase 5: Hardening de Segurança (Opcional) ---
-
-log_cabecalho_fase "5/7 - Hardening de Segurança (Opcional)"
 
 read -p "🔒 Deseja aplicar hardening de segurança (desativar login de root por senha e password authentication)? [s/N] " -n 1 -r -t 10
 echo # Nova linha após a resposta
@@ -520,8 +392,6 @@ else
 fi
 
 # --- Fase 6: Instalação de Pacotes Opcionais ---
-
-log_cabecalho_fase "6/7 - Instalação de Pacotes Opcionais"
 
 install_optional_tools() {
     echo
@@ -540,9 +410,8 @@ install_optional_tools
 
 # --- Fase 7: Verificações Pós-Configuração e Finalização ---
 
-log_cabecalho_fase "7/7 - Verificações Pós-Configuração e Finalização"
-
 log_info "🔍 Verificando status de serviços críticos do Proxmox VE..."
+# Este script apenas verifica se os serviços estão *rodando*.
 if ! systemctl is-active corosync pve-cluster pvedaemon; then
     log_erro "Um ou mais serviços críticos do Proxmox (corosync, pve-cluster, pvedaemon) NÃO estão ativos. Verifique os logs e tente reiniciar manualmente."
     log_info "O script será encerrado devido à falha de serviço crítico."
@@ -551,51 +420,35 @@ else
     log_ok "✅ Todos os serviços críticos do Proxmox VE (corosync, pve-cluster, pvedaemon) estão ativos."
 fi
 
-log_info "🔗 Realizando testes de conectividade essencial do cluster com nós pares..."
-for PEER_IP in "${CLUSTER_PEER_IPS[@]}"; do
-    # Obtém o IP principal do próprio nó para evitar testar a si mesmo
-    # Adaptação para obter o IP da interface que está na CLUSTER_NETWORK (útil se houver múltiplas interfaces)
-    CURRENT_NODE_IP=$(ip -4 addr show dev $(ip r get $CLUSTER_NETWORK | awk '{print $3; exit}') 2>/dev/null | grep -oP 'inet \K[\d.]+')
+log_info "🔗 Realizando testes de conectividade básica (apenas ping) entre todos os nós do cluster..."
+local_ip=$(hostname -I | awk '{print $1}')
 
-    # Fallback se a interface principal da CLUSTER_NETWORK não for encontrada, pega o primeiro IP
-    if [ -z "$CURRENT_NODE_IP" ]; then
-        CURRENT_NODE_IP=$(hostname -I | awk '{print $1}')
-    fi
+for node_entry in "${CLUSTER_NODES_CONFIG[@]}"; do
+    peer_ip=$(echo "$node_entry" | awk '{print $1}')
+    peer_hostname=$(echo "$node_entry" | awk '{print $2}')
 
-    if [ "$PEER_IP" = "$CURRENT_NODE_IP" ]; then
-        continue # Pula o teste se o IP for o do próprio nó
+    if [ "$peer_ip" = "$local_ip" ]; then
+        log_info "ℹ️ Pulando teste de conectividade para o próprio nó: $peer_hostname ($peer_ip)."
+        continue
     fi
 
-    log_info "Testando conexão com o nó $PEER_IP..."
-    if nc -zv "$PEER_IP" 5404 &>/dev/null; then
-        log_info "✅ Conexão Corosync com $PEER_IP (porta 5404) OK."
+    log_info "Testando conexão com o nó $peer_hostname ($peer_ip) via ping..."
+    if ping -c 1 -W 1 "$peer_ip" &>/dev/null; then
+        log_info "✅ Ping com $peer_hostname ($peer_ip) OK."
     else
-        log_erro "Conexão Corosync com $PEER_IP (porta 5404) falhou. Verifique as regras de firewall e a rede."
+        log_erro "Ping com $peer_hostname ($peer_ip) falhou. Verifique a conectividade de rede entre os nós."
     fi
-    if nc -zv "$PEER_IP" 2224 &>/dev/null; then
-        log_info "✅ Conexão pve-cluster com $PEER_IP (porta 2224) OK."
-    else
-        log_erro "Conexão pve-cluster com $PEER_IP (porta 2224) falhou. Verifique as regras de firewall e a rede."
-    fi
-    # Teste de ping para a nova regra ICMP
-    if ping -c 1 -W 1 "$PEER_IP" &>/dev/null; then
-        log_info "✅ Ping com $PEER_IP OK."
-    else
-        log_erro "Ping com $PEER_IP falhou. Verifique as regras de firewall (ICMP) e a conectividade de rede."
-    fi
+    # Testes de porta (5404, 2224) para Corosync e pve-cluster foram removidos daqui, pois dependem de regras de firewall.
 done
 
-log_info "🌍 Testando conexão externa (internet) via HTTPS..."
-if nc -zv google.com 443 &>/dev/null; then
-    log_info "✅ Conexão externa via HTTPS (google.com:443) OK."
+log_info "🌍 Testando conexão externa (internet) via HTTPS (apenas ping para o google.com)..."
+if ping -c 4 google.com &>/dev/null; then
+    log_info "✅ Conexão externa via HTTPS (google.com) OK."
 else
-    log_info "⚠️ **AVISO**: Falha na conexão externa via HTTPS. Verifique as regras de saída do firewall e a conectividade geral com a internet."
+    log_info "⚠️ **AVISO**: Falha na conexão externa. Verifique a conectividade geral com a internet."
 fi
 
 log_info "🧼 Limpando possíveis resíduos de execuções anteriores ou arquivos temporários..."
-# Exemplo de remoção do hook de "no-nag-script" se ele não for mais desejado como permanente
-# MANTENDO o hook, ele se auto-corrige. Se você quiser remover o hook completamente após a primeira execução:
-# log_cmd "rm -f /etc/apt/apt.conf.d/no-nag-script"
 log_info "✅ Limpeza de resíduos concluída."
 
 log_info "🧹 Limpando logs de pós-instalação antigos (com mais de 15 dias) em /var/log/..."
@@ -616,23 +469,22 @@ log_info "📋 O log detalhado de todas as operações está disponível em: **$
 log_info "📝 **RESUMO DA CONFIGURAÇÃO E PRÓXIMOS PASSOS PARA SEU HOMELAB**"
 log_info "---------------------------------------------------------"
 log_info "✔️ Nó configurado: **$NODE_NAME**"
-log_info "✔️ Firewall Proxmox VE ativo com regras para:"
-log_info "    - Acesso ao WebUI (porta 8006) das redes internas"
-log_info "    - Acesso SSH (porta 22) das redes internas"
-log_info "    - Comunicação interna do cluster (Corosync: 5404-5405, pve-cluster: 2224) na rede '$CLUSTER_NETWORK'"
-log_info "    - Ping (ICMP) entre os nós do cluster"
-log_info "    - Acesso de saída para NTP e Internet (HTTPS)"
-log_info "    - Redes Locais ('localnet') configuradas para: 172.20.220.0/24, 172.21.221.0/24, 172.25.125.0/24"
+log_info "✔️ **ATENÇÃO: Este script NÃO configurou nem verificou as regras do firewall Proxmox VE.**"
+log_info "    - **É CRÍTICO que você configure seu firewall separado** para permitir a comunicação essencial do cluster e o acesso à gerência."
+log_info "    - As portas críticas do cluster (Corosync: 5404-5405 UDP, pve-cluster: 2224 TCP) na rede '$CLUSTER_NETWORK' DEVEM ESTAR ABERTAS para todos os nós do cluster."
+log_info "    - As portas de acesso à WebUI (8006 TCP) e SSH (22 TCP) DEVEM ESTAR ABERTAS a partir das suas redes de gerenciamento."
+log_info "    - A sincronização NTP (porta 123 UDP) e o acesso à internet DEVEM SER PERMITIDOS para o funcionamento adequado."
 log_info "✔️ Hardening SSH (desativa login root por senha): $(grep -q "PermitRootLogin prohibit-password" /etc/ssh/sshd_config && echo "Aplicado" || echo "Não aplicado")"
 log_info "✔️ NTP sincronizado: $(timedatectl show --property=NTPSynchronized --value && echo "Sim" || echo "Não")" # Verifica se NTP está sincronizado
 log_info "✔️ Repositórios atualizados: No-Subscription Proxmox VE e Debian Bookworm"
 log_info "---------------------------------------------------------"
 log_info "🔍 **PRÓXIMOS PASSO CRUCIAIS (MANUAIS)**:"
 log_info "1.  **REINICIE O NÓ**: Algumas configurações (especialmente de rede e SSH) só terão efeito total após o reinício. **Isso é fundamental!**"
-log_info "2.  **CRIE O CLUSTER (Primeiro Nó)**: No WebUI do seu primeiro nó, vá em **Datacenter > Cluster > Create Cluster**. Defina um nome para o cluster (ex: Aurora-Luna-Cluster)."
-log_info "3.  **ADICIONE OUTROS NÓS AO CLUSTER**: Nos demais nós, no WebUI, vá em **Datacenter > Cluster > Join Cluster**. Use as informações do primeiro nó (token) para adicioná-los."
-log_info "4.  **CONFIGURE STORAGES**: Após o cluster estar funcional, configure seus storages (LVM-Thin, ZFS, NFS, Ceph, etc.) conforme sua necessidade para armazenar VMs/CTs e ISOs."
-log_info "5.  **CRIE CHAVES SSH (se aplicou hardening)**: Se você aplicou o hardening SSH, configure suas chaves SSH para acesso root antes de fechar a sessão atual, para garantir acesso futuro."
+log_info "2.  **APLIQUE SEU SCRIPT DE FIREWALL**: Certifique-se de executar o script ou método que você usa para configurar as regras de firewall no Proxmox VE para permitir o tráfego necessário."
+log_info "3.  **CRIE O CLUSTER (Primeiro Nó)**: No WebUI do seu primeiro nó, vá em **Datacenter > Cluster > Create Cluster**. Defina um nome para o cluster (ex: Aurora-Luna-Cluster)."
+log_info "4.  **ADICIONE OUTROS NÓS AO CLUSTER**: Nos demais nós, no WebUI, vá em **Datacenter > Cluster > Join Cluster**. Use as informações do primeiro nó (token) para adicioná-los."
+log_info "5.  **CONFIGURE STORAGES**: Após o cluster estar funcional, configure seus storages (LVM-Thin, ZFS, NFS, Ceph, etc.) conforme sua necessidade para armazenar VMs/CTs e ISOs."
+log_info "6.  **CRIE CHAVES SSH (se aplicou hardening)**: Se você aplicou o hardening SSH, configure suas chaves SSH para acesso root antes de fechar a sessão atual, para garantir acesso futuro."
 log_info "---------------------------------------------------------"
 
 # --- REINÍCIO RECOMENDADO ---
