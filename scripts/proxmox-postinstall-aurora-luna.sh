@@ -2,50 +2,71 @@
 
 # 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna
 # Autor: VIPs-com
-# Versão: 1.2.4
+# Versão: 1.1.18
 # Data: 2025-06-05
 #
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
-# A configuração do Firewall agora está em um script separado: proxmox-firewall-config.sh
-#
-# 🔥 PRÉ-REQUISITO CRÍTICO:
-#    Execute o 'diagnostico-proxmox-ambiente.sh' ANTES deste script para validar o ambiente.
-#    Ex: ./diagnostico-proxmox-ambiente.sh && ./proxmox-postinstall-aurora-luna.sh
-#
-# 📌 ORDEM DE EXECUÇÃO DO CLUSTER (MANUAL VIA WEBUI):
-#    Este script assume que o cluster JÁ FOI CRIADO ou será criado MANUALMENTE via WebUI.
-#    1. Crie o cluster no primeiro nó (Datacenter > Cluster > Create Cluster).
-#    2. Junte os outros nós ao cluster (Datacenter > Cluster > Join Cluster).
-#    3. SOMENTE DEPOIS execute este script em CADA NÓ.
 
-# 🔹 VLANs Utilizadas (referência para as regras de firewall):
+# ✅ Verifique ANTES de executar:
+# 1. Você já criou o cluster via WebUI? (Datacenter > Cluster > Create)
+# 2. Todos os nós estão acessíveis via ping?
+# 3. Tem backup dos dados importantes?
+
+#
+#
+# ✅ Instruções de uso local (alternativa ao método com 'curl'):
+#
+#    1. Transfira este script para o seu nó Proxmox (via WebUI Shell, pendrive, scp, etc.).
+#       Exemplo via SCP (executado do seu computador local):
+#       scp /caminho/do/seu/script/post-install.sh root@IP_DO_PROXMOX:/root/post-install.sh
+#
+#    2. Torne o script executável no servidor Proxmox:
+#       chmod +x /root/post-install.sh
+#
+#    3. Execute o script como usuário root (no servidor Proxmox):
+#       /root/post-install.sh
+#       OU
+#       bash /root/post-install.sh
+#
+#
+#
+# 🔹 VLANs Utilizadas:
 #    - 172.20.220.0/24 (Home Lab - Rede principal para comunicação do cluster)
 #    - 172.21.221.0/24 (Rede Interna - Gerenciamento)
 #    - 172.25.125.0/24 (Wi-Fi Arkadia)
 
 
-# 🛠️ CONFIGURAÇÕES ESSENCIAIS (AJUSTE CONFORME SUA INFRAESTRUTURA)
-# Podem ser sobrescritas por /etc/proxmox-postinstall.conf
+# 🛠️ Configurações Essenciais - Podem ser sobrescritas por /etc/proxmox-postinstall.conf
 CLUSTER_NETWORK="172.20.220.0/24" # Rede para comunicação interna do cluster (Corosync, pve-cluster)
 NODE_NAME=$(hostname)             # Nome do servidor atual
 TIMEZONE="America/Sao_Paulo"     # Fuso horário do sistema
 
-# IPs de outros nós do cluster para testes de conectividade pós-configuração.
+# IPs de outros nós do cluster para testes de conectividade.
 # Adicione TODOS os IPs dos seus nós aqui. O script ignorará o IP do próprio nó durante o teste.
 # Exemplo: Se seus nós são 172.20.220.20 (Aurora) e 172.20.220.21 (Luna):
 CLUSTER_PEER_IPS=("172.20.220.20" "172.20.220.21")
 
-# Arquivos de log e lock
-LOG_FILE="/var/log/proxmox-postinstall-$(date +%Y%m%d)-$(hostname).log"
-LOCK_FILE="/etc/proxmox-postinstall.lock"
-START_TIME=$(date +%s) # Início do registro de tempo de execução
+LOG_FILE="/var/log/proxmox-postinstall-$(date +%Y%m%d)-$(hostname).log" # Arquivo de log específico por nó
+LOCK_FILE="/etc/proxmox-postinstall.lock" # Garante que o script não seja executado múltiplas vezes
+START_TIME=$(date +%s)            # Início do registro de tempo de execução
 
-# Configuração de Robustez
-set -e # Sai imediatamente se um comando falhar.
-# set -u # Sai se uma variável não definida for usada (opcional, pode ser muito rigoroso).
+# --- INSTRUÇÕES DE EXECUÇÃO ---
 
-# FUNÇÕES DE LOG E AUXILIARES
-# Cores para a saída no terminal
+# 📌 Método Recomendado: Via WebUI (para cada nó):
+#    1. Acesse o Proxmox WebUI em cada host (ex: Aurora: https://172.20.220.20:8006, Luna: https://172.20.220.21:8006).
+#    2. Vá até a seção "**Shell**" de cada nó.
+#    3. Execute o comando: `curl -sL SEU_URL_DO_SCRIPT/post-install.sh | bash`
+#       (Substitua `SEU_URL_DO_SCRIPT` pelo endereço onde você hospedou este script.
+#        Ex: `https://raw.githubusercontent.com/seuusuario/seurepositorio/main/post-install.sh`)
+#
+# 📌 Método Alternativo: Via SSH (para cada nó):
+#    1. Conecte-se via SSH a cada nó individualmente (ex: `ssh root@172.20.220.20`, depois `ssh root@172.20.220.21`).
+#    2. Execute o comando: `curl -sL SEU_URL_DO_SCRIPT/post-install.sh | bash`
+#       (ATENÇÃO: Se aplicar o "Hardening SSH" no final do script, o login de root por senha será desabilitado. Você precisará de chaves SSH para futuros acessos ao root.)
+
+# --- FUNÇÕES AUXILIARES ---
+
+# Funções de Log
 VERMELHO='\033[0;31m'
 VERDE='\033[0;32m'
 AMARELO='\033[1;33m'
@@ -53,47 +74,97 @@ CIANO='\033[0;36m'
 ROXO='\033[0;35m' # Cor para cabeçalhos de fase
 SEM_COR='\033[0m' # Resetar cor
 
-# Variável de status geral do script (0 = OK, 1 = ERRO)
-overall_script_status=0
+log_info() { printf "\nℹ️ %b%s%b\n" "$CIANO" "$*" "$SEM_COR" | tee -a "$LOG_FILE"; }
+log_ok() { printf "\n✅ %b%s%b\n" "$VERDE" "$*" "$SEM_COR" | tee -a "$LOG_FILE"; }
+log_erro() { printf "\n❌ %b**ERRO**: %s%b\n" "$VERMELHO" "$*" "$SEM_COR" | tee -a "$LOG_FILE"; }
 
-# Funções de log padronizadas
-log_cabecalho_fase() { echo -e "\n${ROXO}FASE: $1${SEM_COR}" | tee -a "$LOG_FILE"; }
-log_info() { echo -e "ℹ️  ${CIANO}$@${SEM_COR}" | tee -a "$LOG_FILE"; }
-log_ok() { echo -e "✅ ${VERDE}$@${SEM_COR}" | tee -a "$LOG_FILE"; }
-log_erro() { echo -e "❌ ${VERMELHO}$@${SEM_COR}" | tee -a "$LOG_FILE"; overall_script_status=1; }
-log_aviso() { echo -e "⚠️  ${AMARELO}$@${SEM_COR}" | tee -a "$LOG_FILE"; }
+log_cabecalho_fase() { printf "\n%bFASE: %s%b\n" "$ROXO" "$1" "$SEM_COLOR" | tee -a "$LOG_FILE"; }
 
-# Função para executar comandos e logar o status
-executar_comando() {
-    local cmd="$@"
-    log_info "Executando: $cmd"
-    # Captura a saída do comando para o log, e o status de saída.
-    if eval "$cmd" >> "$LOG_FILE" 2>&1; then
-        log_ok "Comando executado com sucesso."
-        return 0 # Sucesso
-    else
-        local status=$?
-        log_erro "Falha [$status] ao executar: $cmd"
-        return 1 # Falha
+
+log_cmd() {
+    echo -e "\n🔹 Executando Comando: $*" | tee -a "$LOG_FILE"
+    eval "$@" >> "$LOG_FILE" 2>&1
+    local status=$?
+    if [ $status -ne 0 ]; then
+        echo "❌ **ERRO CRÍTICO** [$status]: Falha ao executar o comando: $*" | tee -a "$LOG_FILE"
+        echo "O script será encerrado. Verifique o log em $LOG_FILE para mais detalhes." | tee -a "$LOG_FILE"
+        exit $status
     fi
+    return $status
 }
 
 # Função para fazer backup de arquivos
-backup_arquivo() {
-    local arquivo="$1"
-    if [ -f "$arquivo" ]; then
-        local dir_backup="/var/backups/proxmox-postinstall"
-        executar_comando "mkdir -p $dir_backup" || return 1
+backup_file() {
+    local file="$1"
+    if [ -f "$file" ]; then
+        local backup_dir="/var/backups/proxmox-postinstall"
+        mkdir -p "$backup_dir"
         local timestamp=$(date +%Y%m%d%H%M%S)
-        local caminho_backup="$dir_backup/$(basename "$arquivo").${timestamp}"
-        log_info "📦 Fazendo backup de '$arquivo' para '$caminho_backup'..."
-        executar_comando "cp -p "$arquivo" "$caminho_backup"" || { log_aviso "Falha ao criar backup de '$arquivo'."; return 1; }
-        log_ok "Backup de '$arquivo' criado com sucesso."
+        local backup_path="$backup_dir/$(basename "$file").${timestamp}"
+        log_info "📦 Fazendo backup de '$file' para '$backup_path'..."
+        cp -p "$file" "$backup_path" >> "$LOG_FILE" 2>&1
+        if [ $? -ne 0 ]; then
+            log_info "⚠️ **AVISO**: Falha ao criar backup de '$file'. Continue com cautela."
+        else
+            log_info "✅ Backup de '$file' criado com sucesso."
+        fi
     else
-        log_info "ℹ️ Arquivo '$arquivo' não encontrado, nenhum backup necessário."
+        log_info "ℹ️ Arquivo '$file' não encontrado, nenhum backup necessário."
     fi
-    return 0
 }
+
+# Função para validar IP
+validate_ip() {
+    local ip="$1"
+    if ! [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        log_erro "IP '$ip' inválido. Use formato 'XXX.XXX.XXX.XXX'."
+        exit 1
+    fi
+}
+
+# Nova função: Configura entradas em /etc/hosts para os nós do cluster
+configurar_hosts() {
+    log_info "📝 Configurando entradas em /etc/hosts para os nós do cluster..."
+    backup_file "/etc/hosts" # Faz backup do /etc/hosts antes de modificar
+
+    # Adaptação para usar CLUSTER_PEER_IPS para configurar /etc/hosts
+    # Assumimos que CLUSTER_PEER_IPS contém IPs e que o hostname do nó atual é o correto para seu IP.
+    # Para outros nós, é ideal ter uma lista de IP e Hostname, mas para simplificar,
+    # vamos adicionar apenas o IP do nó atual e os IPs dos pares.
+    # Para um setup mais robusto, CLUSTER_NODES_CONFIG=("IP HOSTNAME" ...) seria melhor.
+    
+    local current_ip=$(hostname -I | awk '{print $1}') # Pega o primeiro IP do nó atual
+    local current_hostname=$(hostname)
+
+    # Adiciona o próprio nó
+    if ! grep -qE "^$current_ip\s+$current_hostname(\s+|$)" /etc/hosts; then
+        if grep -qE "^$current_ip\s+" /etc/hosts; then
+            log_info "Removendo entrada existente para IP '$current_ip' em /etc/hosts antes de adicionar o hostname correto."
+            log_cmd "sed -i '/^$current_ip\s\+/d' /etc/hosts"
+        fi
+        log_info "Adicionando entrada: '$current_ip $current_hostname' a /etc/hosts."
+        log_cmd "echo \"$current_ip $current_hostname\" >> /etc/hosts"
+    else
+        log_info "Entrada '$current_ip $current_hostname' já existe em /etc/hosts. Pulando."
+    fi
+
+    # Adiciona os IPs dos pares (sem hostname, pois CLUSTER_PEER_IPS não os contém)
+    # Para um ambiente de cluster, é ALTAMENTE recomendado que todos os nós tenham os hostnames dos outros nós em /etc/hosts ou via DNS.
+    # Como CLUSTER_PEER_IPS só tem IPs, vamos adicionar apenas os IPs para garantir a resolução básica.
+    for peer_ip in "${CLUSTER_PEER_IPS[@]}"; do
+        if [ "$peer_ip" = "$current_ip" ]; then
+            continue # Não adiciona o próprio IP novamente
+        fi
+        if ! grep -qE "^$peer_ip\s+" /etc/hosts; then # Verifica se o IP já existe
+            log_info "Adicionando entrada para IP de peer: '$peer_ip' a /etc/hosts (sem hostname, pois não está disponível)."
+            log_cmd "echo \"$peer_ip\" >> /etc/hosts" # Adiciona apenas o IP
+        else
+            log_info "Entrada para IP de peer '$peer_ip' já existe em /etc/hosts. Pulando."
+        fi
+    done
+    log_ok "✅ Configuração de /etc/hosts concluída."
+}
+
 
 # Função para exibir ajuda
 show_help() {
@@ -111,7 +182,8 @@ show_help() {
     exit 0
 }
 
-# PROCESSAMENTO DE OPÇÕES E CARREGAMENTO DE CONFIGURAÇÃO EXTERNA
+# --- PROCESSAMENTO DE OPÇÕES E CARREGAMENTO DE CONFIGURAÇÃO EXTERNA ---
+
 # Processa opções de linha de comando
 SKIP_LOCK=false
 for arg in "$@"; do
@@ -122,181 +194,353 @@ for arg in "$@"; do
     esac
 done
 
-# Carrega configurações de arquivo externo (se existir)
-if [ -f "/etc/proxmox-postinstall.conf" ]; then
-    log_info "⚙️ Carregando configurações de /etc/proxmox-postinstall.conf..."
-    # Garante que as variáveis sejam carregadas para o shell atual
-    source "/etc/proxmox-postinstall.conf"
-    log_ok "Configurações carregadas."
-else
-    log_info "ℹ️ Arquivo de configuração /etc/proxmox-postinstall.conf não encontrado. Usando configurações padrão do script."
+# --- DOWNLOAD E CARREGAMENTO DE CONFIGURAÇÃO EXTERNA ---
+CONFIG_URL="https://raw.githubusercontent.com/VIPs-com/proxmox-scripts/main/etc/proxmox-postinstall.conf"
+CONFIG_FILE="/etc/proxmox-postinstall.conf"
+
+# Se o arquivo de configuração local não existir, baixa do GitHub
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    log_info "⚙️ Arquivo de configuração não encontrado localmente. Tentando baixar do GitHub: $CONFIG_URL..."
+    # Usa curl diretamente e captura o status, sem log_cmd para não abortar o script em caso de falha no download
+    curl -s -o "$CONFIG_FILE" "$CONFIG_URL"
+    if [ $? -eq 0 ] && [ -f "$CONFIG_FILE" ]; then
+        log_ok "✅ Configuração baixada e salva em $CONFIG_FILE."
+    else
+        log_erro "Falha ao baixar configurações do GitHub! Verifique a URL ou conectividade. Continuando com configurações padrão do script."
+        # Remove qualquer arquivo parcialmente baixado para evitar carregar conteúdo incompleto
+        rm -f "$CONFIG_FILE"
+    fi
 fi
 
-# INÍCIO DA EXECUÇÃO DO SCRIPT
+# Carrega configurações do arquivo (local ou recém-baixado)
+if [[ -f "$CONFIG_FILE" ]]; then
+    log_info "⚙️ Carregando configurações de $CONFIG_FILE..."
+    # Garante que as variáveis sejam carregadas para o shell atual
+    source "$CONFIG_FILE"
+    log_ok "✅ Configurações carregadas com sucesso!"
+else
+    log_info "ℹ️ Arquivo de configuração $CONFIG_FILE não encontrado. Usando configurações padrão do script."
+fi
+
+# --- INÍCIO DA EXECUÇÃO DO SCRIPT ---
+
 # 🔒 Prevenção de Múltiplas Execuções
-if [ "$SKIP_LOCK" = false ] && [ -f "$LOCK_FILE" ]; then
+if [[ "$SKIP_LOCK" == "false" && -f "$LOCK_FILE" ]]; then
     log_erro "O script já foi executado anteriormente neste nó ($NODE_NAME). Abortando para evitar configurações duplicadas."
     log_info "Se você realmente precisa re-executar, remova '$LOCK_FILE' ou use '--skip-lock' (NÃO RECOMENDADO)."
     exit 1
 fi
-executar_comando "touch $LOCK_FILE" || { log_erro "Falha ao criar arquivo de lock."; exit 1; }
+touch "$LOCK_FILE" # Cria o arquivo de lock
 
-log_info "📅 INÍCIO: Execução do script de pós-instalação no nó $NODE_NAME em $(date)"
+log_info "📅 **INÍCIO**: Execução do script de pós-instalação no nó **$NODE_NAME** em $(date)"
 
-# DEFINIÇÃO DAS FASES (FUNÇÕES)
+# --- Fase 1: Verificações Iniciais e Validação de Entrada ---
 
-# Fase 1: Configuração de Tempo e NTP
-configurar_tempo_ntp() {
-    log_cabecalho_fase "1/4 - Configuração de Tempo e NTP"
-    log_info "Configurando fuso horário para $TIMEZONE e sincronização NTP..."
-    executar_comando "timedatectl set-timezone $TIMEZONE" || return 1
-    executar_comando "timedatectl set-ntp true" || return 1 # Habilita o systemd-timesyncd
+log_cabecalho_fase "1/7 - Verificações Iniciais e Validação de Entrada"
 
-    # Desabilita o serviço ntp se estiver ativo para evitar conflitos com systemd-timesyncd
-    if systemctl is-active --quiet ntp; then
-        log_info "Serviço 'ntp' detectado e ativo. Desabilitando para evitar conflito com systemd-timesyncd."
-        executar_comando "systemctl stop ntp" || log_aviso "Falha ao parar o serviço 'ntp'."
-        executar_comando "systemctl disable ntp" || log_aviso "Falha ao desabilitar o serviço 'ntp'."
+log_info "🔍 Verificando dependências essenciais do sistema (curl, ping, nc)..."
+check_dependency() {
+    local cmd="$1"
+    if ! command -v "$cmd" &>/dev/null; then
+        log_erro "O comando '$cmd' não foi encontrado. Por favor, instale-o (ex: apt install -y $cmd) e re-execute o script."
+        exit 1
     fi
-
-    executar_comando "systemctl restart systemd-timesyncd" || return 1 # Garante que o serviço esteja rodando
-
-    log_info "Aguardando e verificando a sincronização NTP inicial..."
-    timeout 20 bash -c 'while ! timedatectl status | grep -q "System clock synchronized: yes"; do sleep 1; done'
-    if [ $? -ne 0 ]; then
-        log_aviso "Falha na sincronização NTP após 20 segundos! Verifique a conectividade com servidores NTP."
-        # Tenta sincronizar manualmente com ntpdate como fallback se timedatectl falhar.
-        if ! command -v ntpdate &>/dev/null; then
-            log_info "Instalando ntpdate para tentativa de sincronização manual..."
-            executar_comando "apt update && apt install -y ntpdate" || log_aviso "Falha ao instalar ntpdate."
-        fi
-        if command -v ntpdate &>/dev/null; then
-            log_info "Tentando sincronizar com ntpdate e pool.ntp.org..."
-            if ! ntpdate -s pool.ntp.org >> "$LOG_FILE" 2>&1; then
-                log_erro 'Falha grave ao sincronizar com ntpdate após várias tentativas. Verifique a conectividade de rede e as configurações de NTP.'
-                return 1
-            else
-                log_ok "Sincronização NTP alternativa com ntpdate concluída (verifique o status)."
-            fi
-        fi
-    else
-        log_ok "Sincronização NTP bem-sucedida."
-    fi
-    return 0
+    log_info "✅ Dependência '$cmd' verificada."
 }
+check_dependency "curl"
+check_dependency "ping"
+check_dependency "nc" # Netcat, usado para os testes de porta (apt install -y netcat-traditional ou netcat-openbsd)
 
-# Fase 2: Gerenciamento de Repositórios e Atualizações
-gerenciar_repositorios_atualizacoes() {
-    log_cabecalho_fase "2/4 - Gerenciamento de Repositórios e Atualizações"
-    log_info "Desabilitando repositório de subscrição e habilitando repositório PVE no-subscription..."
-    backup_arquivo "/etc/apt/sources.list.d/pve-enterprise.list"
-    backup_arquivo "/etc/apt/sources.list"
-    backup_arquivo "/etc/apt/sources.list.d/pve-no-subscription.list"
+# Chama a nova função para configurar o /etc/hosts
+configurar_hosts
 
-    # CORREÇÃO CRÍTICA: Garante que o comando sed só seja executado se o arquivo existir
-    if [ -f "/etc/apt/sources.list.d/pve-enterprise.list" ]; then
-        log_info "Comentando a linha do pve-enterprise.list para desabilitar o repositório de subscrição."
-        executar_comando "sed -i 's/^deb/#deb/' /etc/apt/sources.list.d/pve-enterprise.list" || return 1
-    else
-        log_info "ℹ️ Arquivo /etc/apt/sources.list.d/pve-enterprise.list não encontrado. Nenhuma ação necessária para desabilitar o repositório de subscrição."
-    fi
+log_info "🔍 Validando formato dos IPs e máscara de rede..."
+# Validar cada IP do cluster
+for ip in "${CLUSTER_PEER_IPS[@]}"; do
+    validate_ip "$ip"
+done
+log_info "✅ Formato dos IPs em CLUSTER_PEER_IPS verificado."
 
-    executar_comando "echo 'deb http://ftp.debian.org/debian bookworm main contrib' > /etc/apt/sources.list" || return 1
-    executar_comando "echo 'deb http://ftp.debian.org/debian bookworm-updates main contrib' >> /etc/apt/sources.list" || return 1
-    executar_comando "echo 'deb http://security.debian.org/debian-security bookworm-security main contrib' >> /etc/apt/sources.list" || return 1
-    executar_comando "echo 'deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription' > /etc/apt/sources.list.d/pve-no-subscription.list" || return 1
+# Validar formato da rede (ex: 172.20.220.0/24)
+if ! [[ "$CLUSTER_NETWORK" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; then
+    log_erro "Formato de rede inválido em CLUSTER_NETWORK. Use 'IP/MASK' (ex: 172.20.220.0/24)."
+    exit 1
+fi
+log_info "✅ Formato de CLUSTER_NETWORK verificado."
 
-    log_info "Atualizando listas de pacotes e o sistema operacional..."
-    executar_comando "apt update" || return 1
-    executar_comando "apt dist-upgrade -y" || return 1 # Atualiza todos os pacotes e resolve dependências
-    executar_comando "apt autoremove -y" || return 1    # Remove pacotes órfãos
-    executar_comando "apt clean" || return 1            # Limpa o cache de pacotes
-    log_ok "Sistema atualizado."
+log_info "🔍 Verificando conectividade de rede com os repositórios Debian..."
+ping -c 4 ftp.debian.org &>/dev/null
+if [ $? -ne 0 ]; then
+    log_info "⚠️ **AVISO**: Não foi possível pingar 'ftp.debian.org'. A conectividade com a internet pode estar comprometida. As atualizações e instalações podem falhar."
+else
+    log_info "✅ Conectividade com repositórios Debian OK."
+fi
 
-    log_info "Removendo o aviso de assinatura Proxmox VE do WebUI (se não possuir uma licença ativa)..."
-    # Cria um hook para APT que modifica o arquivo JS do WebUI
-    executar_comando "echo \"DPkg::Post-Invoke { \\\"dpkg -V proxmox-widget-toolkit | grep -q '/proxmoxlib.js$'; if [ \\\$? -eq 1 ]; then sed -i '/.*data.status.*{/{s/\\!//;s/active/NoMoreNagging/}' /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js; fi\\\"; };\" > /etc/apt/apt.conf.d/no-nag-script" || return 1
-    executar_comando "apt --reinstall install -y proxmox-widget-toolkit" || return 1
-    log_ok "Aviso de assinatura removido do WebUI (se aplicável)."
-    return 0
-}
+log_info "🔍 Verificando a versão do Proxmox VE..."
+PVE_VERSION=$(pveversion | grep -oP 'pve-manager/\K\d+\.\d+') # Extrai "8.x"
+REQUIRED_MAJOR_VERSION=8
 
-# Fase 3: Hardening de Segurança SSH
-aplicar_hardening_ssh() {
-    log_cabecalho_fase "3/4 - Hardening de Segurança SSH (Opcional)"
-    echo
-    read -p "🔒 Deseja aplicar hardening de segurança (desativar login de root por senha e password authentication)? [s/N] " -n 1 -r -t 10
-    echo # Nova linha após a resposta
+if (( $(echo "$PVE_VERSION" | cut -d'.' -f1) < $REQUIRED_MAJOR_VERSION )); then
+    log_erro "Este script requer Proxmox VE versão $REQUIRED_MAJOR_VERSION.x ou superior. Versão atual detectada: $PVE_VERSION. Não é compatível."
+    exit 1
+elif (( $(echo "$PVE_VERSION" | cut -d'.' -f1) > $REQUIRED_MAJOR_VERSION )); then
+    log_info "⚠️ **AVISO**: Este script foi testado para Proxmox VE $REQUIRED_MAJOR_VERSION.x. Versão $PVE_VERSION pode requerer ajustes ou não ser totalmente compatível."
+    read -p "Continuar mesmo assim? [s/N] " -n 1 -r -t 10
+    echo # Nova linha após a resposta do usuário
     REPLY=${REPLY:-N}
-    if [[ $REPLY =~ ^[Ss]$ ]]; then
-        log_info "Aplicando hardening SSH..."
-        backup_arquivo "/etc/ssh/sshd_config"
-        executar_comando "sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config" || return 1
-        executar_comando "sed -i 's/^#\\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config" || return 1
-        executar_comando "systemctl restart sshd" || return 1
-        log_ok "Hardening aplicado! Atenção: Agora, o acesso ao root via SSH só será possível usando chaves SSH. Certifique-se de tê-las configuradas antes de fechar a sessão atual."
-    else
-        log_info "Hardening SSH ignorado. O login por senha permanece ativo (menos seguro para produção)."
-    fi
-    return 0
-}
+    [[ ! $REPLY =~ ^[Ss]$ ]] && { log_info "Script abortado pelo usuário."; exit 0; }
+else
+    log_info "✅ Versão do Proxmox VE ($PVE_VERSION) compatível."
+fi
 
-# Fase 4: Instalação de Pacotes Opcionais
-instalar_pacotes_opcionais() {
-    log_cabecalho_fase "4/4 - Instalação de Pacotes Opcionais"
+log_info "🔍 Verificando recursos de hardware básicos..."
+MIN_RAM_GB=4 # Mínimo recomendado de RAM em GB para um nó Proxmox VE
+RAM_AVAILABLE_GB=$(free -g | awk '/Mem:/ {print $2}')
+if (( RAM_AVAILABLE_GB < MIN_RAM_GB )); then
+    log_info "⚠️ **AVISO**: Pouca RAM detectada ($RAM_AVAILABLE_GB GB). Mínimo recomendado para Proxmox VE é $MIN_RAM_GB GB. O desempenho pode ser afetado."
+else
+    log_info "✅ RAM disponível ($RAM_AVAILABLE_GB GB) OK."
+fi
+# Adicione mais checks aqui (CPU, disco, etc.) se desejar
+
+# --- Fase 2: Configuração de Tempo e NTP ---
+
+log_cabecalho_fase "2/7 - Configuração de Tempo e NTP"
+
+log_info "⏰ Configurando fuso horário para **$TIMEZONE** e sincronização NTP..."
+
+# Adicionado: Verificação de conectividade NTP inicial
+log_info "🔍 Verificando conectividade com servidores NTP externos (pool.ntp.org:123/UDP)..."
+if ! nc -zvu pool.ntp.org 123 &>/dev/null; then
+    log_erro "Falha na conexão com pool.ntp.org na porta 123 (UDP). Verifique conectividade externa e regras de firewall para NTP."
+else
+    log_ok "✅ Conectividade NTP externa OK."
+fi
+
+log_cmd "timedatectl set-timezone $TIMEZONE"
+log_cmd "timedatectl set-ntp true" # Habilita o systemd-timesyncd
+log_cmd "systemctl restart systemd-timesyncd" # Garante que o serviço esteja rodando
+
+log_info "Aguardando e verificando a sincronização NTP inicial..."
+timeout 15 bash -c 'while ! timedatectl status | grep -q "System clock synchronized: yes"; do sleep 1; done'
+if [ $? -ne 0 ]; then
+    log_info "⚠️ **AVISO**: Falha na sincronização NTP após 15 segundos! Tentando correção alternativa com ntpdate..."
+    # Garante que ntpdate esteja instalado antes de usá-lo
+    command -v ntpdate &>/dev/null || log_cmd "apt install -y ntpdate"
+    # Tenta sincronizar com ntpdate e registra qualquer erro, com múltiplos fallbacks
+    ntpdate -s pool.ntp.org >> "$LOG_FILE" 2>&1 \
+    || ntpdate -s 0.pool.ntp.org >> "$LOG_FILE" 2>&1 \
+    || ntpdate -s 1.pool.ntp.org >> "$LOG_FILE" 2>&1 \
+    || log_erro 'Falha grave ao sincronizar com ntpdate após várias tentativas. Verifique a conectividade de rede e as configurações de NTP.'
+else
+    log_ok "✅ Sincronização NTP bem-sucedida."
+fi
+
+# --- Fase 3: Gerenciamento de Repositórios e Atualizações ---
+
+log_cabecalho_fase "3/7 - Gerenciamento de Repositórios e Atualizações"
+
+log_info "🗑️ Desabilitando repositório de subscrição e habilitando repositório PVE no-subscription..."
+# Faça backup de arquivos de lista de apt antes de modificar
+backup_file "/etc/apt/sources.list.d/pve-enterprise.list"
+backup_file "/etc/apt/sources.list"
+backup_file "/etc/apt/sources.list.d/pve-no-subscription.list"
+
+# CORREÇÃO: Verifica se o arquivo existe antes de tentar modificá-lo
+if [ -f "/etc/apt/sources.list.d/pve-enterprise.list" ]; then
+    log_info "Comentando a linha do pve-enterprise.list para desabilitar o repositório de subscrição."
+    log_cmd "sed -i 's/^deb/#deb/' /etc/apt/sources.list.d/pve-enterprise.list"
+else
+    log_info "ℹ️ Arquivo /etc/apt/sources.list.d/pve-enterprise.list não encontrado. Nenhuma ação necessária para desabilitar o repositório de subscrição."
+fi
+
+
+# Adiciona/sobrescreve os repositórios Debian padrão
+log_cmd "echo 'deb http://ftp.debian.org/debian bookworm main contrib' > /etc/apt/sources.list"
+log_cmd "echo 'deb http://ftp.debian.org/debian bookworm-updates main contrib' >> /etc/apt/sources.list"
+log_cmd "echo 'deb http://security.debian.org/debian-security bookworm-security main contrib' >> /etc/apt/sources.list"
+# Adiciona o repositório Proxmox VE "no-subscription"
+log_cmd "echo 'deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription' > /etc/apt/sources.list.d/pve-no-subscription.list"
+
+log_info "🔄 Atualizando listas de pacotes e o sistema operacional..."
+log_cmd "apt update"
+log_cmd "apt dist-upgrade -y"   # Atualiza todos os pacotes e resolve dependências
+log_cmd "apt autoremove -y"     # Remove pacotes órfãos
+log_cmd "apt clean"             # Limpa o cache de pacotes
+
+log_info "🧹 Removendo o aviso de assinatura Proxmox VE do WebUI (se não possuir uma licença ativa)..."
+# Cria um hook para APT que modifica o arquivo JS do WebUI
+log_cmd "echo \"DPkg::Post-Invoke { \\\"dpkg -V proxmox-widget-toolkit | grep -q '/proxmoxlib.js$'; if [ \\\$? -eq 1 ]; then sed -i '/.*data.status.*{/{s/\\!//;s/active/NoMoreNagging/}' /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js; fi\\\"; };\" > /etc/apt/apt.conf.d/no-nag-script"
+# Reinstala o pacote para aplicar a modificação imediatamente (ou após futuras atualizações do pacote)
+log_cmd "apt --reinstall install -y proxmox-widget-toolkit"
+log_ok "✅ Aviso de assinatura removido do WebUI (se aplicável)."
+
+# --- Fase 4: Configuração de Firewall ---
+
+log_cabecalho_fase "4/7 - Configuração de Firewall"
+
+log_info "🔍 Verificando portas críticas em uso antes de configurar o firewall..."
+# Lista de portas essenciais para Proxmox e cluster
+CRITICAL_PORTS="8006 22 5404 5405 2224"
+for port in $CRITICAL_PORTS; do
+    if ss -tuln | grep -q ":$port "; then
+        log_info "⚠️ **AVISO**: Porta TCP/UDP **$port** já está em uso! Verifique se isso não conflitará com as regras do firewall Proxmox. Se estiver em uso pelo Proxmox ou Corosync, isso é normal."
+    fi
+done
+log_info "✅ Verificação de portas concluída."
+
+log_info "🛡️ Configurando o firewall do Proxmox VE com regras específicas..."
+
+# Adicionado: Tentativa de resetar o firewall para um estado limpo
+log_info "Desativando e limpando todas as regras existentes do firewall Proxmox VE..."
+# Reinstala o pacote pve-firewall para garantir que esteja em um estado limpo
+log_cmd "apt --reinstall install -y pve-firewall"
+
+# Reinicia pvedaemon, pois pve-firewall depende dele
+log_info "Reiniciando o serviço pvedaemon para garantir que o firewall possa se comunicar..."
+log_cmd "systemctl restart pvedaemon"
+log_info "Aguardando 5 segundos para pvedaemon iniciar..."
+sleep 5
+
+# Verifica se pvedaemon está ativo
+if ! systemctl is-active pvedaemon; then
+    log_erro "O serviço pvedaemon NÃO está ativo após o reinício. O script será encerrado."
+    exit 1
+else
+    log_ok "✅ Serviço pvedaemon está ativo."
+fi
+
+# Verifica se o firewall está habilitado e desabilita
+if pve-firewall status | grep -q "Status: enabled"; then
+    log_info "O firewall Proxmox VE está habilitado. Desativando-o temporariamente."
+    log_cmd "pve-firewall disable"
+else
+    log_info "O firewall Proxmox VE já está desabilitado ou não está rodando."
+fi
+
+# --- Início da nova lógica de configuração do firewall via host.fw ---
+FIREWALL_DIR="/etc/pve/nodes/$NODE_NAME/firewall"
+HOST_FW_FILE="$FIREWALL_DIR/host.fw"
+
+log_info "Criando diretório para arquivos de configuração do firewall do host: $FIREWALL_DIR..."
+log_cmd "mkdir -p $FIREWALL_DIR"
+
+log_info "Fazendo backup do arquivo de configuração do firewall do host: $HOST_FW_FILE..."
+backup_file "$HOST_FW_FILE"
+
+log_info "Escrevendo novas regras de firewall para $HOST_FW_FILE..."
+# Inicia o arquivo com as opções padrão e política de DROP para entrada
+cat <<EOF > "$HOST_FW_FILE"
+# firewall for host $NODE_NAME
+#
+[OPTIONS]
+enable: 1
+policy_in: DROP
+policy_out: ACCEPT
+
+[RULES]
+# Regras para permitir acesso ao WebUI (porta 8006) e SSH (porta 22) das redes locais
+IN ACCEPT -p tcp -s 172.20.220.0/24 --dport 8006 -j ACCEPT -c "Acesso WebUI Home Lab"
+IN ACCEPT -p tcp -s 172.21.221.0/24 --dport 8006 -j ACCEPT -c "Acesso WebUI Rede Interna"
+IN ACCEPT -p tcp -s 172.25.125.0/24 --dport 8006 -j ACCEPT -c "Acesso WebUI Wi-Fi Arkadia"
+IN ACCEPT -p tcp -s 172.20.220.0/24 --dport 22 -j ACCEPT -c "Acesso SSH Home Lab"
+IN ACCEPT -p tcp -s 172.21.221.0/24 --dport 22 -j ACCEPT -c "Acesso SSH Rede Interna"
+IN ACCEPT -p tcp -s 172.25.125.0/24 --dport 22 -j ACCEPT -c "Acesso SSH Wi-Fi Arkadia"
+
+# CRÍTICO: Regras para comunicação INTERNA DO CLUSTER (Corosync e pve-cluster)
+IN ACCEPT -p udp -s $CLUSTER_NETWORK --dport 5404:5405 -j ACCEPT -c "Corosync entre nós do cluster"
+IN ACCEPT -p tcp -s $CLUSTER_NETWORK --dport 2224 -j ACCEPT -c "pve-cluster entre nós do cluster"
+
+# Permitir tráfego ICMP (ping) entre os nós do cluster para facilitar diagnósticos
+IN ACCEPT -p icmp -s $CLUSTER_NETWORK -j ACCEPT -c "Permitir ping entre os nós do cluster"
+
+# Regra para permitir tráfego de SAÍDA para NTP (servidores externos)
+OUT ACCEPT -p udp --dport 123 -j ACCEPT -c "Permitir saída para NTP"
+
+# A política padrão de entrada (policy_in: DROP) já bloqueia o tráfego não explicitamente permitido.
+# A política padrão de saída (policy_out: ACCEPT) permite a saída por padrão.
+EOF
+log_ok "✅ Regras de firewall escritas em $HOST_FW_FILE."
+
+# NOVO: Configurando 'localnet' diretamente no cluster.fw
+log_info "Configurando 'localnet' para as VLANs internas no firewall do cluster (cluster.fw)..."
+CLUSTER_FW_FILE="/etc/pve/firewall/cluster.fw"
+backup_file "$CLUSTER_FW_FILE"
+
+# Redes para serem adicionadas ao localnet, separadas por ponto e vírgula
+LOCAL_NETWORKS_LIST="172.20.220.0/24;172.21.221.0/24;172.25.125.0/24"
+
+if [ -f "$CLUSTER_FW_FILE" ]; then
+    # Se [OPTIONS] já existe, tenta inserir as localnets dentro dele
+    if grep -q "^\[OPTIONS\]" "$CLUSTER_FW_FILE"; then
+        log_info "Seção [OPTIONS] encontrada em $CLUSTER_FW_FILE. Inserindo localnets..."
+        # Remove localnets antigas se existirem
+        log_cmd "sed -i '/^localnet:/d' $CLUSTER_FW_FILE"
+        # Insere as novas localnets após a linha [OPTIONS]
+        log_cmd "sed -i '/^\\[OPTIONS\\]/a\\localnet: $LOCAL_NETWORKS_LIST' $CLUSTER_FW_FILE"
+    else
+        # Se [OPTIONS] não existe, adiciona o bloco completo
+        log_info "Seção [OPTIONS] não encontrada em $CLUSTER_FW_FILE. Adicionando bloco OPTIONS com localnets..."
+        # Adiciona o bloco [OPTIONS] e localnets ao final do arquivo
+        log_cmd "echo -e '\n[OPTIONS]\nlocalnet: $LOCAL_NETWORKS_LIST' >> $CLUSTER_FW_FILE"
+    fi
+else
+    log_info "Arquivo $CLUSTER_FW_FILE não encontrado. Criando e adicionando localnets..."
+    log_cmd "echo -e '[OPTIONS]\nlocalnet: $LOCAL_NETWORKS_LIST' > $CLUSTER_FW_FILE"
+fi
+log_ok "✅ Configuração de 'localnet' no firewall do cluster concluída."
+
+
+log_info "Ativando e recarregando o serviço de firewall do Proxmox VE para aplicar as novas regras..."
+# Tenta reiniciar o firewall diretamente, que é mais robusto para aplicar novas configurações
+if ! log_cmd "pve-firewall restart"; then
+    log_erro "Falha ao reiniciar o firewall Proxmox VE. Tentando recarregar as regras como fallback."
+    log_cmd "pve-firewall reload" # Fallback para reload se restart falhar
+fi
+log_ok "✅ Firewall Proxmox VE configurado e recarregado com sucesso."
+
+# --- Fim da nova lógica de configuração do firewall ---
+
+# --- Fase 5: Hardening de Segurança (Opcional) ---
+
+log_cabecalho_fase "5/7 - Hardening de Segurança (Opcional)"
+
+read -p "🔒 Deseja aplicar hardening de segurança (desativar login de root por senha e password authentication)? [s/N] " -n 1 -r -t 10
+echo # Nova linha após a resposta
+REPLY=${REPLY:-N}
+if [[ $REPLY =~ ^[Ss]$ ]]; then
+    log_info "🔒 Aplicando hardening SSH..."
+    backup_file "/etc/ssh/sshd_config"
+    log_cmd "sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config"
+    log_cmd "sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config"
+    log_cmd "systemctl restart sshd"
+    log_info "✅ Hardening aplicado! **Atenção**: Agora, o acesso ao root via SSH só será possível usando chaves SSH. Certifique-se de tê-las configuradas antes de fechar a sessão atual."
+else
+    log_info "ℹ️ Hardening SSH ignorado. O login por senha permanece ativo (menos seguro para produção)."
+fi
+
+# --- Fase 6: Instalação de Pacotes Opcionais ---
+
+log_cabecalho_fase "6/7 - Instalação de Pacotes Opcionais"
+
+install_optional_tools() {
     echo
     read -p "📦 Deseja instalar ferramentas adicionais úteis (ex: qemu-guest-agent, ifupdown2, git, htop, smartmontools)? [s/N] " -n 1 -r -t 10
     echo # Nova linha após a resposta
     REPLY=${REPLY:-N}
     if [[ $REPLY =~ ^[Ss]$ ]]; then
         log_info "Instalando pacotes adicionais..."
-        executar_comando "apt install -y qemu-guest-agent ifupdown2 git htop smartmontools" || return 1
-        log_ok "Pacotes adicionais instalados."
+        log_cmd "apt install -y qemu-guest-agent ifupdown2 git htop smartmontools"
+        log_info "✅ Pacotes adicionais instalados."
     else
-        log_info "Instalação de pacotes adicionais ignorada."
+        log_info "ℹ️ Instalação de pacotes adicionais ignorada."
     fi
-    return 0
 }
+install_optional_tools
 
-# FUNÇÃO AUXILIAR PARA TESTE DE CONECTIVIDADE (USADA NAS VERIFICAÇÕES PÓS-CONFIG)
-# Esta função foi movida para cá para ser usada SOMENTE nas verificações finais,
-# pois as verificações iniciais são feitas pelo 'diagnostico-proxmox-ambiente.sh'.
-# Uso: test_port_connectivity <IP> <PORTA> [tcp|udp]
-test_port_connectivity() {
-    local ip=$1
-    local port=$2
-    local proto=${3:-tcp} # Padrão é TCP se não especificado.
-    local result=1
+# --- Fase 7: Verificações Pós-Configuração e Finalização ---
 
-    if [[ "$proto" == "tcp" ]]; then
-        timeout 2 bash -c "cat < /dev/null > /dev/tcp/$ip/$port" 2>/dev/null
-        result=$?
-    elif [[ "$proto" == "udp" ]]; then
-        timeout 2 nc -uz "$ip" "$port" 2>/dev/null
-        result=$?
-    fi
-    return $result
-}
-
-
-# EXECUÇÃO PRINCIPAL DAS FASES
-# Array de funções a serem executadas. O script para se uma função retornar falha (1).
-declare -a FASES=(
-    "configurar_tempo_ntp"
-    "gerenciar_repositorios_atualizacoes"
-    "aplicar_hardening_ssh"
-    "instalar_pacotes_opcionais"
-)
-
-for fase_func in "${FASES[@]}"; do
-    if ! "$fase_func"; then
-        log_erro "A fase '$fase_func' falhou. Abortando script."
-        exit 1 # Sai do script principal se uma fase falhar
-    fi
-done
-
-# VERIFICAÇÕES PÓS-CONFIGURAÇÃO E FINALIZAÇÃO
-log_cabecalho_fase "Verificações Pós-Configuração e Finalização"
+log_cabecalho_fase "7/7 - Verificações Pós-Configuração e Finalização"
 
 log_info "🔍 Verificando status de serviços críticos do Proxmox VE..."
 if ! systemctl is-active corosync pve-cluster pvedaemon; then
@@ -307,101 +551,91 @@ else
     log_ok "✅ Todos os serviços críticos do Proxmox VE (corosync, pve-cluster, pvedaemon) estão ativos."
 fi
 
-log_info "🔗 Realizando testes de conectividade essencial do cluster com nós pares (após configuração inicial)..."
-log_info "⚠️ NOTA: A conectividade pode ser afetada se o script de firewall separado ainda não foi executado."
+log_info "🔗 Realizando testes de conectividade essencial do cluster com nós pares..."
 for PEER_IP in "${CLUSTER_PEER_IPS[@]}"; do
     # Obtém o IP principal do próprio nó para evitar testar a si mesmo
-    CURRENT_NODE_IP=$(hostname -I | awk '{print $1}') # Pega o primeiro IP local
+    # Adaptação para obter o IP da interface que está na CLUSTER_NETWORK (útil se houver múltiplas interfaces)
+    CURRENT_NODE_IP=$(ip -4 addr show dev $(ip r get $CLUSTER_NETWORK | awk '{print $3; exit}') 2>/dev/null | grep -oP 'inet \K[\d.]+')
+
+    # Fallback se a interface principal da CLUSTER_NETWORK não for encontrada, pega o primeiro IP
+    if [ -z "$CURRENT_NODE_IP" ]; then
+        CURRENT_NODE_IP=$(hostname -I | awk '{print $1}')
+    fi
 
     if [ "$PEER_IP" = "$CURRENT_NODE_IP" ]; then
         continue # Pula o teste se o IP for o do próprio nó
     fi
 
     log_info "Testando conexão com o nó $PEER_IP..."
-    # Teste para portas Corosync (UDP) - Estas portas devem estar abertas para comunicação do cluster
-    if test_port_connectivity "$PEER_IP" 5404 "udp"; then
-        log_ok "Conexão Corosync com $PEER_IP (porta 5404 UDP) OK."
+    if nc -zv "$PEER_IP" 5404 &>/dev/null; then
+        log_info "✅ Conexão Corosync com $PEER_IP (porta 5404) OK."
     else
-        log_erro "FALHA: Conexão Corosync com $PEER_IP (porta 5404 UDP) falhou. Verifique as regras de firewall e a conectividade de rede."
+        log_erro "Conexão Corosync com $PEER_IP (porta 5404) falhou. Verifique as regras de firewall e a rede."
     fi
-    if test_port_connectivity "$PEER_IP" 5405 "udp"; then
-        log_ok "Conexão Corosync com $PEER_IP (porta 5405 UDP) OK."
+    if nc -zv "$PEER_IP" 2224 &>/dev/null; then
+        log_info "✅ Conexão pve-cluster com $PEER_IP (porta 2224) OK."
     else
-        log_erro "FALHA: Conexão Corosync com $PEER_IP (porta 5405 UDP) falhou. Verifique as regras de firewall e a conectividade de rede."
+        log_erro "Conexão pve-cluster com $PEER_IP (porta 2224) falhou. Verifique as regras de firewall e a rede."
     fi
-    if test_port_connectivity "$PEER_IP" 5406 "udp"; then
-        log_ok "Conexão Corosync com $PEER_IP (porta 5406 UDP) OK."
-    else
-        log_erro "FALHA: Conexão Corosync com $PEER_IP (porta 5406 UDP) falhou. Verifique as regras de firewall e a conectividade de rede."
-    fi
-    if test_port_connectivity "$PEER_IP" 5407 "udp"; then
-        log_ok "Conexão Corosync com $PEER_IP (porta 5407 UDP) OK."
-    else
-        log_erro "FALHA: Conexão Corosync com $PEER_IP (porta 5407 UDP) falhou. Verifique as regras de firewall e a conectividade de rede."
-    fi
-
-    # Teste para porta pve-cluster (TCP)
-    if test_port_connectivity "$PEER_IP" 2224 "tcp"; then
-        log_ok "Conexão pve-cluster com $PEER_IP (porta 2224 TCP) OK."
-    else
-        log_erro "FALHA: Conexão pve-cluster com $PEER_IP (porta 2224 TCP) falhou. Verifique as regras de firewall e a conectividade de rede."
-    fi
-
-    # Teste de ping
+    # Teste de ping para a nova regra ICMP
     if ping -c 1 -W 1 "$PEER_IP" &>/dev/null; then
-        log_ok "Ping com $PEER_IP OK."
+        log_info "✅ Ping com $PEER_IP OK."
     else
-        log_aviso "Ping com $PEER_IP falhou. Isso pode ser esperado se as regras de ICMP ainda não foram aplicadas pelo script de firewall."
+        log_erro "Ping com $PEER_IP falhou. Verifique as regras de firewall (ICMP) e a conectividade de rede."
     fi
 done
 
 log_info "🌍 Testando conexão externa (internet) via HTTPS..."
 if nc -zv google.com 443 &>/dev/null; then
-    log_ok "Conexão externa via HTTPS (google.com:443) OK."
+    log_info "✅ Conexão externa via HTTPS (google.com:443) OK."
 else
-    log_aviso "Falha na conexão externa via HTTPS. Verifique a conectividade geral com a internet."
+    log_info "⚠️ **AVISO**: Falha na conexão externa via HTTPS. Verifique as regras de saída do firewall e a conectividade geral com a internet."
 fi
 
 log_info "🧼 Limpando possíveis resíduos de execuções anteriores ou arquivos temporários..."
-log_ok "Limpeza de resíduos concluída."
+# Exemplo de remoção do hook de "no-nag-script" se ele não for mais desejado como permanente
+# MANTENDO o hook, ele se auto-corrige. Se você quiser remover o hook completamente após a primeira execução:
+# log_cmd "rm -f /etc/apt/apt.conf.d/no-nag-script"
+log_info "✅ Limpeza de resíduos concluída."
 
 log_info "🧹 Limpando logs de pós-instalação antigos (com mais de 15 dias) em /var/log/..."
-executar_comando "find /var/log -name \"proxmox-postinstall-*.log\" -mtime +15 -exec rm {} \\;" || log_aviso "Falha na limpeza de logs antigos."
-log_ok "Limpeza de logs antigos concluída."
+# Encontra e remove logs mais antigos que 15 dias
+log_cmd "find /var/log -name \"proxmox-postinstall-*.log\" -mtime +15 -exec rm {} \\;"
+log_info "✅ Limpeza de logs antigos concluída."
 
 # Cálculo do tempo total de execução
 END_TIME=$(date +%s)
 ELAPSED_TIME=$((END_TIME - START_TIME))
 
-log_info "✅ **FINALIZADO**: Configuração inicial do nó **$NODE_NAME** concluída em $(date)."
+log_info "✅ **FINALIZADO**: Configuração concluída com sucesso no nó **$NODE_NAME** em $(date)."
 log_info "⏳ Tempo total de execução do script: **$ELAPSED_TIME segundos**."
 log_info "📋 O log detalhado de todas as operações está disponível em: **$LOG_FILE**."
 
-# Resumo da Configuração e Próximos Passos
-log_cabecalho_fase "RESUMO DA CONFIGURAÇÃO E PRÓXIMOS PASSOS"
+# --- Resumo da Configuração e Próximos Passos ---
+
 log_info "📝 **RESUMO DA CONFIGURAÇÃO E PRÓXIMOS PASSOS PARA SEU HOMELAB**"
 log_info "---------------------------------------------------------"
 log_info "✔️ Nó configurado: **$NODE_NAME**"
-log_info "✔️ Firewall Proxmox VE: As regras de firewall DEVEM ser configuradas separadamente com o script `proxmox-firewall-config.sh`."
+log_info "✔️ Firewall Proxmox VE ativo com regras para:"
+log_info "    - Acesso ao WebUI (porta 8006) das redes internas"
+log_info "    - Acesso SSH (porta 22) das redes internas"
+log_info "    - Comunicação interna do cluster (Corosync: 5404-5405, pve-cluster: 2224) na rede '$CLUSTER_NETWORK'"
+log_info "    - Ping (ICMP) entre os nós do cluster"
+log_info "    - Acesso de saída para NTP e Internet (HTTPS)"
+log_info "    - Redes Locais ('localnet') configuradas para: 172.20.220.0/24, 172.21.221.0/24, 172.25.125.0/24"
 log_info "✔️ Hardening SSH (desativa login root por senha): $(grep -q "PermitRootLogin prohibit-password" /etc/ssh/sshd_config && echo "Aplicado" || echo "Não aplicado")"
-log_info "✔️ NTP sincronizado: $(timedatectl show --property=NTPSynchronized --value && echo "Sim" || echo "Não")"
+log_info "✔️ NTP sincronizado: $(timedatectl show --property=NTPSynchronized --value && echo "Sim" || echo "Não")" # Verifica se NTP está sincronizado
 log_info "✔️ Repositórios atualizados: No-Subscription Proxmox VE e Debian Bookworm"
 log_info "---------------------------------------------------------"
-log_info "🔍 LEMBRETE IMPORTANTE DE FLUXO:"
-log_info "    Este script foi executado APÓS a criação manual do cluster via WebUI (se aplicável)."
-log_info "    Isso garante que as chaves e certificados do cluster foram gerados corretamente."
-log_info "---------------------------------------------------------"
-log_info "👉 PRÓXIMOS PASSOS CRUCIAIS (MANUAIS):"
+log_info "🔍 **PRÓXIMOS PASSO CRUCIAIS (MANUAIS)**:"
 log_info "1.  **REINICIE O NÓ**: Algumas configurações (especialmente de rede e SSH) só terão efeito total após o reinício. **Isso é fundamental!**"
-log_info "2.  **ACESSE O WEBUI**: Se você ainda não fez, acesse o WebUI de um dos nós para verificar o status do cluster e das configurações:"
-log_info "    - Ex: https://172.20.220.20:8006"
-log_info "3.  **CONFIGURE O FIREWALL**: Execute o script `proxmox-firewall-config.sh` em CADA NÓ. **Isso é CRÍTICO para a segurança e funcionalidade da rede!**"
-log_info "4.  **CONFIGURE STORAGES**: Após o cluster estar funcional e os nós reiniciados, configure seus storages (LVM-Thin, ZFS, NFS, Ceph, etc.) conforme sua necessidade para armazenar VMs/CTs e ISOs."
-log_info "5.  **CRIE CHAVES SSH (se aplicou hardening)**: Se você optou por aplicar o hardening SSH, configure suas chaves SSH para acesso root *antes* de fechar a sessão atual, para garantir acesso futuro."
-log_info "6.  **VERIFIQUE O DIAGNÓSTICO NOVAMENTE**: Execute o 'diagnostico-proxmox-ambiente.sh' novamente para confirmar que todas as pendências foram resolvidas."
+log_info "2.  **CRIE O CLUSTER (Primeiro Nó)**: No WebUI do seu primeiro nó, vá em **Datacenter > Cluster > Create Cluster**. Defina um nome para o cluster (ex: Aurora-Luna-Cluster)."
+log_info "3.  **ADICIONE OUTROS NÓS AO CLUSTER**: Nos demais nós, no WebUI, vá em **Datacenter > Cluster > Join Cluster**. Use as informações do primeiro nó (token) para adicioná-los."
+log_info "4.  **CONFIGURE STORAGES**: Após o cluster estar funcional, configure seus storages (LVM-Thin, ZFS, NFS, Ceph, etc.) conforme sua necessidade para armazenar VMs/CTs e ISOs."
+log_info "5.  **CRIE CHAVES SSH (se aplicou hardening)**: Se você aplicou o hardening SSH, configure suas chaves SSH para acesso root antes de fechar a sessão atual, para garantir acesso futuro."
 log_info "---------------------------------------------------------"
 
-# REINÍCIO RECOMENDADO
+# --- REINÍCIO RECOMENDADO ---
 echo
 read -p "⟳ **REINÍCIO ALTAMENTE RECOMENDADO**: Para garantir que todas as configurações sejam aplicadas, é **fundamental** reiniciar o nó. Deseja reiniciar agora? [s/N] " -n 1 -r -t 15
 echo # Adiciona uma nova linha após a resposta do usuário ou timeout
@@ -411,9 +645,7 @@ REPLY=${REPLY:-N}
 
 if [[ $REPLY =~ ^[Ss]$ ]]; then
     log_info "🔄 Reiniciando o nó **$NODE_NAME** agora..."
-    executar_comando "reboot" || log_erro "Falha ao iniciar o reboot."
+    log_cmd "reboot"
 else
     log_info "ℹ️ Reinício adiado. Lembre-se de executar 'reboot' manualmente no nó **$NODE_NAME** o mais rápido possível para aplicar todas as mudanças."
 fi
-
-exit "$overall_script_status" # Retorna o status geral do script
