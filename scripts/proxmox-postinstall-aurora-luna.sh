@@ -2,7 +2,7 @@
 
 # 🚀 Script Pós-Instalação Proxmox VE 8 - Cluster Aurora/Luna
 # Autor: VIPs-com
-# Versão: 1.2.1
+# Versão: 1.2.2
 # Data: 2025-06-05
 #
 # Este script DEVE SER EXECUTADO INDIVIDUALMENTE em cada nó do cluster Proxmox.
@@ -195,7 +195,14 @@ gerenciar_repositorios_atualizacoes() {
     backup_arquivo "/etc/apt/sources.list"
     backup_arquivo "/etc/apt/sources.list.d/pve-no-subscription.list"
 
-    executar_comando "sed -i 's/^deb/#deb/' /etc/apt/sources.list.d/pve-enterprise.list" || return 1
+    # CORREÇÃO CRÍTICA: Garante que o comando sed só seja executado se o arquivo existir
+    if [ -f "/etc/apt/sources.list.d/pve-enterprise.list" ]; then
+        log_info "Comentando a linha do pve-enterprise.list para desabilitar o repositório de subscrição."
+        executar_comando "sed -i 's/^deb/#deb/' /etc/apt/sources.list.d/pve-enterprise.list" || return 1
+    else
+        log_info "ℹ️ Arquivo /etc/apt/sources.list.d/pve-enterprise.list não encontrado. Nenhuma ação necessária para desabilitar o repositório de subscrição."
+    fi
+
     executar_comando "echo 'deb http://ftp.debian.org/debian bookworm main contrib' > /etc/apt/sources.list" || return 1
     executar_comando "echo 'deb http://ftp.debian.org/debian bookworm-updates main contrib' >> /etc/apt/sources.list" || return 1
     executar_comando "echo 'deb http://security.debian.org/debian-security bookworm-security main contrib' >> /etc/apt/sources.list" || return 1
@@ -374,7 +381,7 @@ log_info "📋 O log detalhado de todas as operações está disponível em: **$
 
 # --- Resumo da Configuração e Próximos Passos ---
 log_cabecalho_fase "RESUMO DA CONFIGURAÇÃO E PRÓXIMOS PASSOS"
-log_info "📝 **RESUMO DA CONFIGURAÇÃO E PRÓXIMOS PASSOS PARA SEU HOMELAB**"
+log_info "📝 **RESUMO DA CONFIGURAÇÃO E PRÓXIMOS PASSO PARA SEU HOMELAB**"
 log_info "---------------------------------------------------------"
 log_info "✔️ Nó configurado: **$NODE_NAME**"
 log_info "✔️ Firewall Proxmox VE: As regras de firewall DEVEM ser configuradas separadamente com o script `proxmox-firewall-config.sh`."
@@ -390,7 +397,7 @@ log_info "👉 PRÓXIMOS PASSOS CRUCIAIS (MANUAIS):"
 log_info "1.  **REINICIE O NÓ**: Algumas configurações (especialmente de rede e SSH) só terão efeito total após o reinício. **Isso é fundamental!**"
 log_info "2.  **ACESSE O WEBUI**: Se você ainda não fez, acesse o WebUI de um dos nós para verificar o status do cluster e das configurações:"
 log_info "    - Ex: https://172.20.220.20:8006"
-log_info "3.  **CONFIGURE O FIREWALL**: Execute o script `proxmox-firewall-config.sh` (o que você criou separadamente) em CADA NÓ. **Isso é CRÍTICO para a segurança e funcionalidade da rede!**"
+log_info "3.  **CONFIGURE O FIREWALL**: Execute o script `proxmox-firewall-config.sh` em CADA NÓ. **Isso é CRÍTICO para a segurança e funcionalidade da rede!**"
 log_info "4.  **CONFIGURE STORAGES**: Após o cluster estar funcional e os nós reiniciados, configure seus storages (LVM-Thin, ZFS, NFS, Ceph, etc.) conforme sua necessidade para armazenar VMs/CTs e ISOs."
 log_info "5.  **CRIE CHAVES SSH (se aplicou hardening)**: Se você optou por aplicar o hardening SSH, configure suas chaves SSH para acesso root *antes* de fechar a sessão atual, para garantir acesso futuro."
 log_info "6.  **VERIFIQUE O DIAGNÓSTICO NOVAMENTE**: Execute o 'diagnostico-proxmox-ambiente.sh' novamente para confirmar que todas as pendências foram resolvidas."
