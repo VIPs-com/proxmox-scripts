@@ -1,4 +1,3 @@
-
 # 🚀 Proxmox Scripts - Cluster Aurora/Luna (v12.1)
 
 ![Proxmox Version](https://img.shields.io/badge/Proxmox-8.x-orange)
