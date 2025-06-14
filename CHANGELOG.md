@@ -1,3 +1,6 @@
+## [2025-06-14]
+- 📦 Scripts atualizados automaticamente
+
 ## [2025-06-06]
 - 📦 Scripts atualizados automaticamente
 
